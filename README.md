@@ -1,0 +1,2 @@
+# minimal-window-manager
+mwm
