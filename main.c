@@ -434,4 +434,3 @@ void cleanup()
     
     XCloseDisplay(dpy);
 }
-//
