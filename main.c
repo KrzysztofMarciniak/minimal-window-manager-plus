@@ -81,6 +81,7 @@ static void sigHandler(int sig) {
     (void)sig;
     running = 0;
 }
+
 static int xerrorstart(Display *dpy, XErrorEvent *ee) {
     (void)dpy;
     (void)ee;
@@ -92,8 +93,6 @@ static int xerror(Display *dpy, XErrorEvent *ee) {
     (void)ee;
     return 0;
 }
-
-
 
 static void setup(void) {
     if (!getenv("DISPLAY")) die("DISPLAY not set");

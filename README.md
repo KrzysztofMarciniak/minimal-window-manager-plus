@@ -1,21 +1,32 @@
 # Minimal Window Manager (MWM)
 
-MWM (Minimal Window Manager) is a lightweight and minimalistic window manager written in **C**. This project is designed to provide a simple and efficient solution for managing windows in a graphical environment, with a focus on performance and simplicity.
+MWM (Minimal Window Manager) is a lightweight, minimalistic window manager written in **C**. It was designed with the following guiding principles:
 
-## Repository Structure
-
-- **Source Code**: The main functionality of the window manager is implemented in **C**.
-- **Build System**: Utilizes a `Makefile` for building and managing the project.
+* Less than 500 lines of code.
+* No status bar required.
+* Only 2 windows per desktop.
+* No borders or gaps between windows.
+* No floating windows.
 
 ## Getting Started
+- **Mod + Enter**: Open terminal window.
+- **Mod + p**: Launch dmenu.
+- **Mod + q**: Close the focused window.
+- **Mod + Shift + q**: Exit MWM.
+- **Mod + j**: Focus on the left window.
+- **Mod + l**: Focus on the right window.
+- **Mod + [0-9]**: Switch to desktop [0-9].
+- **Mod + Shift + [0-9]**: Move the focused window to desktop [0-9].
 
-### Prerequisites
-
-To build and run MWM, you will need:
-
+## Prerequisites
+To build and run MWM, you'll need:
 - A C compiler (e.g., `gcc`).
-- `make` (for building the project).
+- `make` for building the project.
 - A Linux-based environment with X11 support.
+
+Optional, but recommended:
+- `st` (simple terminal).
+- `dmenu` (for launching applications).
 
 ### Building the Project
 
@@ -36,4 +47,3 @@ doas make install
 ```bash
 exec dbus-launch --sh-syntax --exit-with-session mwm
 ```
-
