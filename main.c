@@ -74,12 +74,10 @@ static void sigHandler(int sig) {
     (void)sig;
     running = 0;
 }
-
 static int xerrorstart(Display *dpy, XErrorEvent *ee) {
     (void)dpy;
     (void)ee;
-    write(2, "mwm: another window manager is already running\n", 47);
-    exit(1);
+    die("another window manager is already running");
 }
 
 static int xerror(Display *dpy, XErrorEvent *ee) {
@@ -88,16 +86,16 @@ static int xerror(Display *dpy, XErrorEvent *ee) {
     return 0;
 }
 
+static void die(const char *msg) {
+    write(STDERR_FILENO, "mwm: ", 5);
+    write(STDERR_FILENO, msg, strlen(msg));
+    write(STDERR_FILENO, "\n", 1);
+    exit(EXIT_FAILURE);
+}
+
 static void setup(void) {
-    if (!getenv("DISPLAY")) {
-        write(2, "mwm: DISPLAY not set\n", 21);
-        exit(1);
-    }
-    
-    if (!(dpy = XOpenDisplay(NULL))) {
-        write(2, "mwm: cannot open display\n", 25);
-        exit(1);
-    }
+    if (!getenv("DISPLAY")) die("DISPLAY not set");
+    if (!(dpy = XOpenDisplay(NULL))) die("cannot open display");
 
     root = DefaultRootWindow(dpy);
     
