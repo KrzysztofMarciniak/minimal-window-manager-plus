@@ -70,6 +70,13 @@ int main(void) {
     return 0;
 }
 
+static void die(const char *msg) {
+    write(STDERR_FILENO, "mwm: ", 5);
+    write(STDERR_FILENO, msg, strlen(msg));
+    write(STDERR_FILENO, "\n", 1);
+    exit(EXIT_FAILURE);
+}
+
 static void sigHandler(int sig) {
     (void)sig;
     running = 0;
@@ -86,12 +93,7 @@ static int xerror(Display *dpy, XErrorEvent *ee) {
     return 0;
 }
 
-static void die(const char *msg) {
-    write(STDERR_FILENO, "mwm: ", 5);
-    write(STDERR_FILENO, msg, strlen(msg));
-    write(STDERR_FILENO, "\n", 1);
-    exit(EXIT_FAILURE);
-}
+
 
 static void setup(void) {
     if (!getenv("DISPLAY")) die("DISPLAY not set");
