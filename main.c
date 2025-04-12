@@ -11,6 +11,8 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/select.h>
+#include <X11/keysym.h>
+#include <X11/XF86keysym.h>
 
 #define MAX_DESKTOPS 9
 #define MAX_WINDOWS_PER_DESKTOP 2
@@ -37,7 +39,11 @@ static int screen_width, screen_height;
 
 static const AppLauncher launchers[] = {
     { XK_Return, 0, "st" },
-    { XK_p, 0, "dmenu_run" }
+    { XK_p, 0, "dmenu_run" },
+    { XF86XK_AudioRaiseVolume, 0, AUDIO_SCRIPT " +" },
+    { XF86XK_AudioLowerVolume, 0, AUDIO_SCRIPT " -" },
+    { XF86XK_AudioMicMute, 0, AUDIO_SCRIPT " mic" },
+    { XF86XK_AudioMute, 0, AUDIO_SCRIPT " aud" }
 };
 
 static void setup(void);
