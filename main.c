@@ -12,7 +12,10 @@
 #include <signal.h>
 #include <sys/select.h>
 #include <X11/XF86keysym.h>
+#include <X11/cursorfont.h>
 
+static int resizeDelta = 0;
+#define RESIZE_STEP 50
 #define MAX_DESKTOPS 9
 #define MAX_WINDOWS_PER_DESKTOP 2
 #define MOD_KEY Mod4Mask
@@ -63,7 +66,6 @@ static void focusWindow(Window w);
 static void tileWindows(void);
 static void switchDesktop(int desktop);
 static void moveWindowToDesktop(Window win, int desktop);
-static int findWindowInCurrentDesktop(Window w);
 static void grabKeys(void);
 static void sigHandler(int);
 static int xerrorstart(Display*, XErrorEvent*);
@@ -94,10 +96,9 @@ static void sigHandler(int sig) {
     running = 0;
 }
 
-static int xerrorstart(Display *dpy, XErrorEvent *ee) {
-    (void)dpy;
-    (void)ee;
+static int xerrorstart(Display *dpy __attribute__((unused)), XErrorEvent *ee __attribute__((unused))) {
     die("another window manager is already running");
+    return -1;
 }
 
 static int xerror(Display *dpy, XErrorEvent *ee) {
@@ -121,6 +122,8 @@ static void setup(void) {
     
     XSetErrorHandler(xerrorstart);
     XSelectInput(dpy, root, SubstructureRedirectMask | SubstructureNotifyMask | StructureNotifyMask);
+    Cursor cursor = XCreateFontCursor(dpy, XC_left_ptr);
+    XDefineCursor(dpy, root, cursor);
     XSync(dpy, False);
     XSetErrorHandler(xerror);
     
@@ -141,6 +144,7 @@ static void grabKeys(void) {
     keycodes[k++] = XKeysymToKeycode(dpy, XK_q);
     keycodes[k++] = XKeysymToKeycode(dpy, XK_j);
     keycodes[k++] = XKeysymToKeycode(dpy, XK_l);
+    keycodes[k++] = XKeysymToKeycode(dpy, XK_h); 
 
     for (int i = 0; i < k; i++) {
         if (keycodes[i] == 0)
@@ -211,8 +215,8 @@ static void killFocusedWindow(void) {
         XKillClient(dpy, win);
         XFree(p);
         return;
-    send:
         XEvent ev;
+    send:
         memset(&ev, 0, sizeof(ev));
         ev.type = ClientMessage;
         ev.xclient.window = win;
@@ -246,6 +250,18 @@ static void handleKeyPress(XEvent *e) {
         return;
     }
     
+    if (keysym == XK_h && state == (MOD_KEY | ShiftMask)) {
+        resizeDelta -= RESIZE_STEP;
+        tileWindows();
+        return;
+    }
+
+    if (keysym == XK_l && state == (MOD_KEY | ShiftMask)) {
+        resizeDelta += RESIZE_STEP;
+        tileWindows();
+        return;
+    }
+        
     if (keysym == XK_q && state == MOD_KEY) {
         killFocusedWindow();
         return;
@@ -387,22 +403,11 @@ static void removeWindow(Window w) {
 }
 
 static void handleUnmapNotify(XEvent *e) {
-    if (!e->xunmap.send_event)
-        removeWindow(e->xunmap.window);
+    removeWindow(e->xunmap.window);
 }
 
 static void handleDestroyNotify(XEvent *e) {
     removeWindow(e->xdestroywindow.window);
-}
-
-static int findWindowInCurrentDesktop(Window w) 
-{
-    for (int i = 0; i < desktops[currentDesktop].windowCount; i++) {
-        if (desktops[currentDesktop].windows[i] == w) {
-            return i;
-        }
-    }
-    return -1;
 }
 
 static void cleanup(void) 
@@ -415,6 +420,7 @@ static void cleanup(void)
     
     XCloseDisplay(dpy);
 }
+
 static void tileWindows(void) {
     Desktop *d = &desktops[currentDesktop];
     int tiledCount = 0;
@@ -428,18 +434,29 @@ static void tileWindows(void) {
     if (tiledCount == 0) return;
 
     if (tiledCount == 1) {
-        XMoveResizeWindow(dpy, d->windows[0], 0, 0, screen_width, screen_height);
+        int width = screen_width;
+        int x = (screen_width - width) / 2;
+        XMoveResizeWindow(dpy, d->windows[0], x, 0, width, screen_height);
     } else {
-        int half = screen_width / 2;
+        int minSize = 100;
+        int half = (screen_width + resizeDelta) / 2;
+        if (half < minSize) half = minSize; 
+
         for (int i = 0; i < tiledCount; i++) {
             if (i < tiledCount / 2) {
-                XMoveResizeWindow(dpy, d->windows[i], 0, 0, half, screen_height);
+                int width = half;
+                if (width < minSize) width = minSize;
+                XMoveResizeWindow(dpy, d->windows[i], 0, 0, width, screen_height);
             } else {
-                XMoveResizeWindow(dpy, d->windows[i], half, 0, screen_width - half, screen_height);
+                int width = screen_width - half;
+                if (width < minSize) width = minSize;
+                XMoveResizeWindow(dpy, d->windows[i], half, 0, width, screen_height);
             }
         }
     }
 }
+
+
 
 static void handleMapNotify(XEvent *e) {
     XMapEvent *ev = &e->xmap;

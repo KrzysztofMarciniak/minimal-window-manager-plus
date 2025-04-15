@@ -9,15 +9,23 @@ MWM (Minimal Window Manager) is a lightweight, minimalistic window manager writt
 * No floating windows.
 
 ## Getting Started
-- **Mod + Enter**: Open terminal window.
-- **Mod + p**: Launch dmenu.
-- **Mod + q**: Close the focused window.
-- **Mod + Shift + q**: Exit MWM.
-- **Mod + j**: Focus on the left window.
-- **Mod + l**: Focus on the right window.
-- **Mod + [0-9]**: Switch to desktop [0-9].
-- **Mod + Shift + [0-9]**: Move the focused window to desktop [0-9].
+### Keyboard Shortcuts
 
+#### Window Management
+- **Mod + Enter**: Launch terminal
+- **Mod + q**: Close focused window
+- **Mod + Shift + q**: Exit MWM
+- **Mod + j**: Focus left window
+- **Mod + l**: Focus right window
+- **Mod + Shift + l**: Increase window size
+- **Mod + Shift + h**: Decrease window size
+
+#### Desktop Navigation
+- **Mod + [0-9]**: Switch to desktop [0-9]
+- **Mod + Shift + [0-9]**: Move focused window to desktop [0-9]
+
+#### Application Launcher
+- **Mod + p**: Launch dmenu (application menu)
 ## Prerequisites
 To build and run MWM, you'll need:
 - A C compiler (e.g., `gcc`).
