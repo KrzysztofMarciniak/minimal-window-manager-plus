@@ -137,7 +137,7 @@ static void setup(void) {
 static void grabKeys(void) {
   const unsigned int modifiers[] = {MOD_KEY, MOD_KEY | ShiftMask};
   const int modCount = sizeof(modifiers) / sizeof(modifiers[0]);
-  KeyCode keycodes[40]; // Increased size to account for more keys.
+  KeyCode keycodes[40];
   int k = 0;
 
   for (int i = 0; i < MAX_DESKTOPS; i++) {
