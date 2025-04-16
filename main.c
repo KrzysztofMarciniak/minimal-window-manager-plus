@@ -277,15 +277,10 @@ if ((keysym == XK_h || keysym == XK_l) && state == (MOD_KEY | ShiftMask)) {
     return;
   }
 
-  if (keysym == XK_j && state == MOD_KEY) {
-    focusCycleWindow(1);
+if ((keysym == XK_j || keysym == XK_l) && state == MOD_KEY) {
+    focusCycleWindow(keysym == XK_j ? 1 : -1);
     return;
-  }
-
-  if (keysym == XK_l && state == MOD_KEY) {
-    focusCycleWindow(-1);
-    return;
-  }
+}
 
   if (keysym >= XK_1 && keysym <= XK_9) {
     int num = keysym - XK_1;
