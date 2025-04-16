@@ -19,8 +19,6 @@ static int resizeDelta = 0;
 #define MAX_DESKTOPS 9
 #define MAX_WINDOWS_PER_DESKTOP 2
 #define MOD_KEY Mod4Mask
-#define focusNextWindow() focusCycleWindow(1)
-#define focusPrevWindow() focusCycleWindow(-1)
 
 typedef struct {
   Window windows[MAX_WINDOWS_PER_DESKTOP];
@@ -285,12 +283,12 @@ static void handleKeyPress(XEvent *e) {
   }
 
   if (keysym == XK_j && state == MOD_KEY) {
-    focusNextWindow();
+    focusCycleWindow(1);
     return;
   }
 
   if (keysym == XK_l && state == MOD_KEY) {
-    focusPrevWindow();
+    focusCycleWindow(-1);
     return;
   }
 
