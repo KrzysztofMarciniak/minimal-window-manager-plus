@@ -41,7 +41,7 @@ static int screen_width, screen_height;
 
 static const AppLauncher launchers[] = {
     {XK_Return, "st"},
-    {XK_p, "dmenu_run -m '0' -fn 'Monospace-8' -nb '#000000' -nf '#ffffff' -sb "
+    {XK_p, "dmenu_run -m '0' -nb '#000000' -nf '#ffffff' -sb "
            "'#ffffff' -sf '#000000'"},
     {XF86XK_AudioRaiseVolume, AUDIO_SCRIPT " +"},
     {XF86XK_AudioLowerVolume, AUDIO_SCRIPT " -"},
