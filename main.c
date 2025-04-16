@@ -60,7 +60,7 @@ static void handleMapRequest(XEvent *e);
 static void handleUnmapNotify(XEvent *e);
 static void handleDestroyNotify(XEvent *e);
 static void handleConfigureNotify(XEvent *e);
-static void focusWindow(Window w);
+inline static void focusWindow(Window w);
 static void tileWindows(void);
 static void switchDesktop(int desktop);
 static void moveWindowToDesktop(Window win, int desktop);
@@ -72,7 +72,7 @@ static void killFocusedWindow(void);
 static void focusCycleWindow(int);
 static void removeWindow(Window w);
 static void handleMapNotify(XEvent *e);
-static void die(const char *msg);
+inline static void die(const char *msg);
 
 int main(void) {
   signal(SIGTERM, sigHandler);
@@ -83,10 +83,8 @@ int main(void) {
   return 0;
 }
 
-static void die(const char *msg) {
-  write(STDERR_FILENO, "mwm: ", 5);
-  write(STDERR_FILENO, msg, strlen(msg));
-  write(STDERR_FILENO, "\n", 1);
+inline static void die(const char *msg) {
+  fprintf(stderr, "mwm: %s\n", msg);
   exit(EXIT_FAILURE);
 }
 
@@ -397,7 +395,7 @@ static void handleMapRequest(XEvent *e) {
   }
 }
 
-static void focusWindow(Window w) {
+inline static void focusWindow(Window w) {
   XSetInputFocus(dpy, w, RevertToParent, CurrentTime);
 }
 
