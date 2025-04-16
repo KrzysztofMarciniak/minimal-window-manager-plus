@@ -265,17 +265,12 @@ static void handleKeyPress(XEvent *e) {
     return;
   }
 
-  if (keysym == XK_h && state == (MOD_KEY | ShiftMask)) {
-    resizeDelta -= RESIZE_STEP;
+if ((keysym == XK_h || keysym == XK_l) && state == (MOD_KEY | ShiftMask)) {
+    resizeDelta += (keysym == XK_l) ? RESIZE_STEP : -RESIZE_STEP;
     tileWindows();
     return;
-  }
+}
 
-  if (keysym == XK_l && state == (MOD_KEY | ShiftMask)) {
-    resizeDelta += RESIZE_STEP;
-    tileWindows();
-    return;
-  }
 
   if (keysym == XK_q && state == MOD_KEY) {
     killFocusedWindow();
