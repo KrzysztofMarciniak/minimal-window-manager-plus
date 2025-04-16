@@ -31,7 +31,6 @@ typedef struct {
 
 typedef struct {
   KeySym keysym;
-  unsigned int modifiers;
   const char *command;
 } AppLauncher;
 
@@ -43,14 +42,13 @@ static volatile sig_atomic_t running = 1;
 static int screen_width, screen_height;
 
 static const AppLauncher launchers[] = {
-    {XK_Return, 0, "st"},
-    {XK_p, 0,
-     "dmenu_run -m '0' -fn 'Monospace-8' -nb '#000000' -nf '#ffffff' -sb "
-     "'#ffffff' -sf '#000000'"},
-    {XF86XK_AudioRaiseVolume, 0, AUDIO_SCRIPT " +"},
-    {XF86XK_AudioLowerVolume, 0, AUDIO_SCRIPT " -"},
-    {XF86XK_AudioMicMute, 0, AUDIO_SCRIPT " mic"},
-    {XF86XK_AudioMute, 0, AUDIO_SCRIPT " aud"}};
+    {XK_Return, "st"},
+    {XK_p, "dmenu_run -m '0' -fn 'Monospace-8' -nb '#000000' -nf '#ffffff' -sb "
+           "'#ffffff' -sf '#000000'"},
+    {XF86XK_AudioRaiseVolume, AUDIO_SCRIPT " +"},
+    {XF86XK_AudioLowerVolume, AUDIO_SCRIPT " -"},
+    {XF86XK_AudioMicMute, AUDIO_SCRIPT " mic"},
+    {XF86XK_AudioMute, AUDIO_SCRIPT " aud"}};
 
 static void setup(void);
 static void run(void);
@@ -132,6 +130,7 @@ static void setup(void) {
   grabKeys();
   XSync(dpy, False);
 }
+
 static void grabKeys(void) {
   const unsigned int modifiers[] = {MOD_KEY, MOD_KEY | ShiftMask};
   const int modCount = sizeof(modifiers) / sizeof(modifiers[0]);
@@ -161,8 +160,7 @@ static void grabKeys(void) {
   for (size_t i = 0; i < launcherCount; i++) {
     KeyCode code = XKeysymToKeycode(dpy, launchers[i].keysym);
     if (code != 0) {
-      XGrabKey(dpy, code, MOD_KEY | launchers[i].modifiers, root, True,
-               GrabModeAsync, GrabModeAsync);
+      XGrabKey(dpy, code, MOD_KEY, root, True, GrabModeAsync, GrabModeAsync);
     }
   }
 }
@@ -235,20 +233,18 @@ static void killFocusedWindow(void) {
     XKillClient(dpy, win);
     XFree(p);
     return;
-    XEvent ev;
-  send:
-    memset(&ev, 0, sizeof(ev));
-    ev.type = ClientMessage;
-    ev.xclient.window = win;
-    ev.xclient.message_type = XInternAtom(dpy, "WM_PROTOCOLS", False);
-    ev.xclient.format = 32;
-    ev.xclient.data.l[0] = del;
-    ev.xclient.data.l[1] = CurrentTime;
-    XSendEvent(dpy, win, False, NoEventMask, &ev);
-    XFree(p);
-  } else {
-    XKillClient(dpy, win);
   }
+  XEvent ev;
+send:
+  memset(&ev, 0, sizeof(ev));
+  ev.type = ClientMessage;
+  ev.xclient.window = win;
+  ev.xclient.message_type = XInternAtom(dpy, "WM_PROTOCOLS", False);
+  ev.xclient.format = 32;
+  ev.xclient.data.l[0] = del;
+  ev.xclient.data.l[1] = CurrentTime;
+  XSendEvent(dpy, win, False, NoEventMask, &ev);
+  XFree(p);
   XFlush(dpy);
 }
 
@@ -317,9 +313,7 @@ static void handleKeyPress(XEvent *e) {
 
   const size_t launcherCount = sizeof(launchers) / sizeof(launchers[0]);
   for (size_t i = 0; i < launcherCount; i++) {
-    if (keysym == launchers[i].keysym &&
-        state == (MOD_KEY | launchers[i].modifiers)) {
-
+    if (keysym == launchers[i].keysym && state == MOD_KEY) {
       if (fork() == 0) {
         setsid();
         close(0);
