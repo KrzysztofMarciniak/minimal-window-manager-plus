@@ -59,7 +59,7 @@ static void handleConfigureNotify(XEvent *e);
 inline static void focusWindow(Window w);
 static void tileWindows(void);
 static void switchDesktop(int desktop);
-static void moveWindowToDesktop(Window win, int desktop);
+static void moveWindowToDesktop(Window win, unsigned char desktop);
 static void grabKeys(void);
 static void sigHandler(int);
 static int xerrorstart(Display *, XErrorEvent *);
@@ -76,7 +76,6 @@ int main(void) {
   setup();
   run();
   cleanup();
-  return 0;
 }
 
 inline static void die(const char *msg) {
@@ -281,23 +280,22 @@ if ((keysym == XK_j || keysym == XK_l) && state == MOD_KEY) {
     focusCycleWindow(keysym == XK_j ? 1 : -1);
     return;
 }
+if (keysym >= XK_1 && keysym <= XK_9) {
+    unsigned char num = keysym - XK_1;
+    
+    Window focused;
+    int revert_to;
+    XGetInputFocus(dpy, &focused, &revert_to); 
 
-  if (keysym >= XK_1 && keysym <= XK_9) {
-    int num = keysym - XK_1;
     if (state == MOD_KEY) {
-      switchDesktop(num);
-      return;
-    } else if (state == (MOD_KEY | ShiftMask)) {
-      Window focused;
-      int revert_to;
-      XGetInputFocus(dpy, &focused, &revert_to);
-
-      if (focused != None && focused != root) {
+        switchDesktop(num);  
+    } else if (state == (MOD_KEY | ShiftMask) && focused != None && focused != root) {
         moveWindowToDesktop(focused, num);
-      }
-      return;
     }
-  }
+    return;
+}
+
+
 
   const size_t launcherCount = sizeof(launchers) / sizeof(launchers[0]);
   for (size_t i = 0; i < launcherCount; i++) {
@@ -340,23 +338,25 @@ static inline int detachWindowFromDesktop(Window w, Desktop *d) {
   return 0;
 }
 
-static void moveWindowToDesktop(Window win, int desktop) {
-  if (desktop < 0 || desktop >= MAX_DESKTOPS || desktop == currentDesktop)
-    return;
 
-  Desktop *target = &desktops[desktop];
-  if (target->windowCount >= MAX_WINDOWS_PER_DESKTOP)
-    return;
+static void moveWindowToDesktop(Window win, unsigned char desktop) {
+    if (desktop >= MAX_DESKTOPS || desktop == currentDesktop)
+        return;
 
-  Desktop *current = &desktops[currentDesktop];
-  if (!detachWindowFromDesktop(win, current))
-    return;
+    Desktop *target = &desktops[desktop];
+    if (target->windowCount >= MAX_WINDOWS_PER_DESKTOP)
+        return;
 
-  target->windows[target->windowCount++] = win;
+    Desktop *current = &desktops[currentDesktop];
+    if (!detachWindowFromDesktop(win, current))
+        return;
 
-  XUnmapWindow(dpy, win);
-  tileWindows();
+    target->windows[target->windowCount++] = win;
+
+    XUnmapWindow(dpy, win);
+    tileWindows();
 }
+
 
 static void handleMapRequest(XEvent *e) {
   XMapRequestEvent *ev = &e->xmaprequest;
