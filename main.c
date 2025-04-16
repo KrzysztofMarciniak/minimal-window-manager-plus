@@ -44,7 +44,9 @@ static int screen_width, screen_height;
 
 static const AppLauncher launchers[] = {
     {XK_Return, 0, "st"},
-    {XK_p, 0, "dmenu_run"},
+    {XK_p, 0,
+     "dmenu_run -m '0' -fn 'Monospace-8' -nb '#000000' -nf '#ffffff' -sb "
+     "'#ffffff' -sf '#000000'"},
     {XF86XK_AudioRaiseVolume, 0, AUDIO_SCRIPT " +"},
     {XF86XK_AudioLowerVolume, 0, AUDIO_SCRIPT " -"},
     {XF86XK_AudioMicMute, 0, AUDIO_SCRIPT " mic"},
@@ -70,6 +72,7 @@ static void killFocusedWindow(void);
 static void focusCycleWindow(int);
 static void removeWindow(Window w);
 static void handleMapNotify(XEvent *e);
+static void die(const char *msg);
 
 int main(void) {
   signal(SIGTERM, sigHandler);
@@ -131,21 +134,21 @@ static void setup(void) {
   grabKeys();
   XSync(dpy, False);
 }
-
 static void grabKeys(void) {
   const unsigned int modifiers[] = {MOD_KEY, MOD_KEY | ShiftMask};
   const int modCount = sizeof(modifiers) / sizeof(modifiers[0]);
-
-  KeyCode keycodes[20];
+  KeyCode keycodes[40]; // Increased size to account for more keys.
   int k = 0;
+
   for (int i = 0; i < MAX_DESKTOPS; i++) {
     keycodes[k++] = XKeysymToKeycode(dpy, XK_1 + i);
   }
 
-  keycodes[k++] = XKeysymToKeycode(dpy, XK_q);
-  keycodes[k++] = XKeysymToKeycode(dpy, XK_j);
-  keycodes[k++] = XKeysymToKeycode(dpy, XK_l);
-  keycodes[k++] = XKeysymToKeycode(dpy, XK_h);
+  KeySym specialKeys[] = {XK_q, XK_j, XK_l, XK_h};
+
+  for (int i = 0; i < sizeof(specialKeys) / sizeof(specialKeys[0]); i++) {
+    keycodes[k++] = XKeysymToKeycode(dpy, specialKeys[i]);
+  }
 
   for (int i = 0; i < k; i++) {
     if (keycodes[i] == 0)
@@ -389,8 +392,6 @@ static void handleMapRequest(XEvent *e) {
     XMapWindow(dpy, ev->window);
     focusWindow(ev->window);
   } else {
-    fprintf(stderr, "Too many windows on desktop %d. Killing window 0x%lx.\n",
-            currentDesktop, ev->window);
     XKillClient(dpy, ev->window);
     XFlush(dpy);
   }
