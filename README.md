@@ -1,8 +1,5 @@
 # Minimal Window Manager (MWM)
-Expnaded version
-* [mwm+](https://github.com/KrzysztofMarciniak/minimal-window-manager-plus)
 
-  
 MWM (Minimal Window Manager) is a lightweight, minimalistic window manager written in **C**. It was designed with the following guiding principles:
 
 * Less than 500 lines of code (clang-formatted).
