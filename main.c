@@ -5,6 +5,7 @@
 #include <X11/keysym.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <math.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -17,7 +18,7 @@
 static int resizeDelta = 0;
 #define RESIZE_STEP 50
 #define MAX_DESKTOPS 9
-#define MAX_WINDOWS_PER_DESKTOP 2
+#define MAX_WINDOWS_PER_DESKTOP 6
 #define MOD_KEY Mod4Mask
 
 typedef struct {
@@ -401,40 +402,33 @@ static void cleanup(void) {
 
   XCloseDisplay(dpy);
 }
-
 static void tileWindows(void) {
-  Desktop *d = &desktops[currentDesktop];
+  Desktop *d      = &desktops[currentDesktop];
+  int windowCount = d->windowCount;
 
-  Window mappedWindows[MAX_WINDOWS_PER_DESKTOP];
-  int mappedCount = 0;
+  if (windowCount == 0) return;
 
-  for (int i = 0; i < d->windowCount; i++) {
-    if (d->isMapped[i]) {
-      mappedWindows[mappedCount++] = d->windows[i];
-    }
+  int cols = (int)sqrt(windowCount);
+  int rows = (windowCount + cols - 1) / cols;
+
+  int width  = screen_width / cols;
+  int height = screen_height / rows;
+
+  for (int i = 0; i < windowCount; i++) {
+    int row = i / cols;
+    int col = i % cols;
+
+    int x = col * width;
+    int y = row * height;
+
+    XMoveResizeWindow(dpy, d->windows[i], x, y, width, height);
   }
 
-  if (mappedCount == 0) return;
-
-  if (mappedCount == 1) {
-    int width = screen_width;
-    int x     = 0;
-    XMoveResizeWindow(dpy, mappedWindows[0], x, 0, width, screen_height);
-  } else {
-    int minSize = 100;
-    int half    = (screen_width + resizeDelta) / 2;
-    if (half < minSize) half = minSize;
-    if (half > screen_width - minSize) half = screen_width - minSize;
-
-    for (int i = 0; i < mappedCount; i++) {
-      if (i == 0) {
-        XMoveResizeWindow(dpy, mappedWindows[i], 0, 0, half, screen_height);
-      } else {
-        XMoveResizeWindow(dpy, mappedWindows[i], half, 0, screen_width - half, screen_height);
-      }
-    }
+  if (windowCount > 0) {
+    XRaiseWindow(dpy, d->windows[d->focusedIdx]);
   }
 }
+
 static void mapWindowToDesktop(Window win) {
   Desktop *d = &desktops[currentDesktop];
 
