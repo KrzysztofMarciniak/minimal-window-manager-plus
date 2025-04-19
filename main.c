@@ -402,31 +402,20 @@ static void cleanup(void) {
 
   XCloseDisplay(dpy);
 }
+
 static void tileWindows(void) {
-  Desktop *d      = &desktops[currentDesktop];
-  int windowCount = d->windowCount;
-
-  if (windowCount == 0) return;
-
-  int cols = (int)sqrt(windowCount);
-  int rows = (windowCount + cols - 1) / cols;
-
+  Desktop *d = &desktops[currentDesktop];
+  int count  = d->windowCount;
+  if (count == 0) return;
+  int cols   = (int)sqrt(count);
   int width  = screen_width / cols;
-  int height = screen_height / rows;
-
-  for (int i = 0; i < windowCount; i++) {
-    int row = i / cols;
-    int col = i % cols;
-
-    int x = col * width;
-    int y = row * height;
-
+  int height = screen_height / ((count + cols - 1) / cols);
+  for (int i = 0; i < count; i++) {
+    int x = (i % cols) * width;
+    int y = (i / cols) * height;
     XMoveResizeWindow(dpy, d->windows[i], x, y, width, height);
   }
-
-  if (windowCount > 0) {
-    XRaiseWindow(dpy, d->windows[d->focusedIdx]);
-  }
+  XRaiseWindow(dpy, d->windows[d->focusedIdx]);
 }
 
 static void mapWindowToDesktop(Window win) {
