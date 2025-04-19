@@ -14,10 +14,18 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Cache apt dependencies
+      uses: actions/cache@v4
+      with:
+        path: /tmp/apt-cache  
+        key: ${{ runner.os }}-apt-${{ hashFiles('**/Makefile') }} 
+        restore-keys: |
+          ${{ runner.os }}-apt-
+
     - name: Set up environment
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential 
+        sudo apt-get install -y build-essential libx11-dev
 
     - name: Build the project
       run: make
@@ -36,7 +44,6 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          dist/*  # If your build creates any files (like binaries or zips), attach them here
+          dist/*  
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
-
