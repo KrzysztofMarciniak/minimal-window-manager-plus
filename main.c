@@ -140,7 +140,7 @@ static void grabKeys(void) {
 
   KeySym specialKeys[] = {XK_q, XK_j, XK_l, XK_h};
 
-  for (int i = 0; i < sizeof(specialKeys) / sizeof(specialKeys[0]); i++) {
+  for (size_t i = 0; i < sizeof(specialKeys) / sizeof(specialKeys[0]); i++) {
     keycodes[k++] = XKeysymToKeycode(dpy, specialKeys[i]);
   }
 
