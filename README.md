@@ -2,11 +2,12 @@
 
 MWM (Minimal Window Manager) is a lightweight, minimalistic window manager written in **C**. It was designed with the following guiding principles:
 
-* Less than 500 lines of code.
+* Less than 500 lines of code (clang-formatted).
 * No status bar required.
 * Only 2 windows per desktop.
 * No borders or gaps between windows.
 * No floating windows.
+* No compiler warnings.
 
 ## Getting Started
 ### Keyboard Shortcuts
@@ -48,7 +49,11 @@ cd minimal-window-manager
 ```
 3. Install:
 ```bash
-doas make install
+if command -v doas > /dev/null; then
+  doas make install
+else
+  sudo make install
+fi
 ```
 4. Add to xinitrc:
 
