@@ -1,10 +1,10 @@
-AUDIO_SCRIPT ?= "$(shell pwd)/audio.sh"
 CC = gcc
-CFLAGS = -Wall -Wextra -pedantic -O3 -march=native -flto -ffast-math -fomit-frame-pointer -ffunction-sections -fdata-sections -DAUDIO_SCRIPT="\"$(AUDIO_SCRIPT)\""
+CFLAGS = -Wall -Wextra -pedantic -O3 -march=native -flto -ffast-math -fomit-frame-pointer -ffunction-sections -fdata-sections -Os -DAUDIO_SCRIPT="\"$(shell pwd)/audio.sh\""
 LDFLAGS = -lX11 -Wl,--gc-sections -Wl,--as-needed -Wl,-O1 -lm
 TARGET = mwm
 SRC = main.c
 PREFIX = /usr/local
+DESTDIR =
 
 all: $(TARGET)
 
@@ -23,3 +23,4 @@ clean:
 	rm -f $(TARGET)
 
 .PHONY: all install uninstall clean
+

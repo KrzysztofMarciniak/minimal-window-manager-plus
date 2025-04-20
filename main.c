@@ -43,11 +43,7 @@ static int screen_width, screen_height;
 static const AppLauncher launchers[] = {{XK_Return, "st"},
                                         {XK_p,
                                          "dmenu_run -m '0' -nb '#000000' -nf '#ffffff' -sb "
-                                         "'#ffffff' -sf '#000000'"},
-                                        {XF86XK_AudioRaiseVolume, AUDIO_SCRIPT " +"},
-                                        {XF86XK_AudioLowerVolume, AUDIO_SCRIPT " -"},
-                                        {XF86XK_AudioMicMute, AUDIO_SCRIPT " mic"},
-                                        {XF86XK_AudioMute, AUDIO_SCRIPT " aud"}};
+                                         "'#ffffff' -sf '#000000'"}};
 
 static void setup(void);
 static void run(void);
