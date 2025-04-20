@@ -39,7 +39,7 @@ Optional, but recommended:
 - `dmenu` (for launching applications).
 
 ### Building the Project
-
+#### default (not recommended):
 1. Clone the repository:
 ```bash
 git clone https://github.com/KrzysztofMarciniak/minimal-window-manager.git
@@ -57,9 +57,26 @@ sudo make install
 ```bash
 exec dbus-launch --sh-syntax --exit-with-session mwm
 ```
-
+#### compressed (recommended):
+0. You have to install [upx](https://github.com/upx/upx).
+1. Clone the repository:
+```bash
+git clone https://github.com/KrzysztofMarciniak/minimal-window-manager.git
+```
+2. Navigate to the project directory: 
+```bash
+cd minimal-window-manager
+```
+3. Install the compressed version:
+```bash
+sudo make install_compressed
+```
+4. Add to xinitrc:
+```bash
+exec dbus-launch --sh-syntax --exit-with-session mwm.upx
+```
 ### statistics:
-
+#### uncompressed:
 * size:
 ```
    text	   data	    bss	    dec	    hex	filename
@@ -92,4 +109,18 @@ exec dbus-launch --sh-syntax --exit-with-session mwm
    0.6%     160   0.8%      96    .gnu.version
  100.0%  25.2Ki 100.0%  11.7Ki    TOTAL
 ```
-
+#### compressed:
+* size (broke):
+```
+   text	   data	    bss	    dec	    hex	filename
+      0	      0	      0	      0	      0	mwm.upx
+```
+* bloaty:
+```
+    FILE SIZE        VM SIZE    
+ --------------  -------------- 
+  33.1%  4.00Ki  70.7%  24.6Ki    [LOAD #0 [RW]]
+  51.2%  6.18Ki  29.3%  10.2Ki    [LOAD #1 [RX]]
+  15.7%  1.90Ki   0.0%       0    [Unmapped]
+ 100.0%  12.1Ki 100.0%  34.8Ki    TOTAL
+```

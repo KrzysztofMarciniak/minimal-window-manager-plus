@@ -14,13 +14,31 @@ $(TARGET): $(SRC)
 install: $(TARGET)
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
 	install -m 755 $(TARGET) $(DESTDIR)$(PREFIX)/bin/
-	strip --strip-all $(DESTDIR)$(PREFIX)/bin/$(TARGET)
+
+install_compressed: $(TARGET)
+	mkdir -p $(DESTDIR)$(PREFIX)/bin
+	$(MAKE) compress
+	install -m 755 $(TARGET).upx $(DESTDIR)$(PREFIX)/bin/
+
+compress: $(TARGET)
+	@if command -v upx > /dev/null 2>&1; then \
+		if upx -t $(TARGET) > /dev/null 2>&1; then \
+			echo "$(TARGET) is already packed, skipping compression."; \
+		else \
+			cp $(TARGET) $(TARGET).upx; \
+			upx -9 -v $(TARGET).upx; \
+		fi; \
+	else \
+		echo "You have to install UPX to compress the binary."; \
+		echo "Install UPX from https://github.com/upx/upx"; \
+		exit 1; \
+	fi
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(TARGET)
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(TARGET).upx
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) $(TARGET).upx
 
-.PHONY: all install uninstall clean
-
+.PHONY: all install install_compressed compress uninstall clean
