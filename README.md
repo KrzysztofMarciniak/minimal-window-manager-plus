@@ -39,7 +39,7 @@ Optional, but recommended:
 - `dmenu` (for launching applications).
 
 ### Building the Project
-#### default (not recommended):
+#### default (`recommended`) (lower in runtime memory but bigger disk size.):
 1. Clone the repository:
 ```bash
 git clone https://github.com/KrzysztofMarciniak/minimal-window-manager.git
@@ -57,7 +57,7 @@ sudo make install
 ```bash
 exec dbus-launch --sh-syntax --exit-with-session mwm
 ```
-#### compressed (recommended):
+#### compressed (higher in runtime memory, smaller in disk size.):
 0. You have to install [upx](https://github.com/upx/upx).
 1. Clone the repository:
 ```bash
