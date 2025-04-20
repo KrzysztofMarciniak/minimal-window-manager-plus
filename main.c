@@ -403,30 +403,31 @@ static void cleanup(void) {
   XCloseDisplay(dpy);
 }
 
-static void tileWindows(void) {    
-    Desktop *d = &desktops[currentDesktop];    
-    int count = d->windowCount;    
-    if (count == 0) return;    
-    int masterCount = count > 1 ? 1 : 0;    
-    int stackCount = count - masterCount;    
-    int masterWidth = screen_width * 0.6;    
-    int stackWidth = screen_width - masterWidth;    
-    int masterHeight = screen_height / masterCount;    
-    int stackHeight = screen_height / stackCount;    
+static void tileWindows(void) {
+  Desktop *d = &desktops[currentDesktop];
+  int count  = d->windowCount;
+  if (count == 0) return;
+  int masterCount  = count > 1 ? 1 : 0;
+  int stackCount   = count - masterCount;
+  int masterWidth  = screen_width * 0.6;
+  int stackWidth   = screen_width - masterWidth;
+  int masterHeight = screen_height / masterCount;
+  int stackHeight  = screen_height / stackCount;
 
-    if (count == 1) {
-        XMoveResizeWindow(dpy, d->windows[0], 0, 0, screen_width, screen_height);
-        XRaiseWindow(dpy, d->windows[0]);
-        return;
-    }
-
-    if (masterCount > 0) {        
-        XMoveResizeWindow(dpy, d->windows[0], 0, 0, masterWidth, masterHeight);    
-    }    
-    for (int i = 0; i < stackCount; i++) {        
-        XMoveResizeWindow(dpy, d->windows[i + masterCount], masterWidth, i * stackHeight, stackWidth, stackHeight);    
-    }    
+  if (count == 1) {
+    XMoveResizeWindow(dpy, d->windows[0], 0, 0, screen_width, screen_height);
     XRaiseWindow(dpy, d->windows[0]);
+    return;
+  }
+
+  if (masterCount > 0) {
+    XMoveResizeWindow(dpy, d->windows[0], 0, 0, masterWidth, masterHeight);
+  }
+  for (int i = 0; i < stackCount; i++) {
+    XMoveResizeWindow(dpy, d->windows[i + masterCount], masterWidth, i * stackHeight, stackWidth,
+                      stackHeight);
+  }
+  XRaiseWindow(dpy, d->windows[0]);
 }
 
 static void mapWindowToDesktop(Window win) {
