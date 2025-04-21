@@ -44,10 +44,10 @@ static const AppLauncher launchers[] = {{XK_Return, "st"},
                                         {XK_p,
                                          "dmenu_run -m '0' -nb '#000000' -nf '#ffffff' -sb "
                                          "'#ffffff' -sf '#000000'"},
-                                         {XF86XK_AudioRaiseVolume, AUDIO_SCRIPT " +"},
-                                         {XF86XK_AudioLowerVolume, AUDIO_SCRIPT " -"},
-                                         {XF86XK_AudioMicMute, AUDIO_SCRIPT " mic"},
-                                         {XF86XK_AudioMute, AUDIO_SCRIPT " aud"}};
+                                        {XF86XK_AudioRaiseVolume, AUDIO_SCRIPT " +"},
+                                        {XF86XK_AudioLowerVolume, AUDIO_SCRIPT " -"},
+                                        {XF86XK_AudioMicMute, AUDIO_SCRIPT " mic"},
+                                        {XF86XK_AudioMute, AUDIO_SCRIPT " aud"}};
 
 static void setup(void);
 static void run(void);
@@ -407,19 +407,19 @@ static void tileWindows(void) {
   Desktop *d = &desktops[currentDesktop];
   int count  = d->windowCount;
   if (count == 0) return;
-  int masterCount  = count > 1 ? 1 : 0;
-  int stackCount   = count - masterCount;
-  int masterWidth  = screen_width * 0.6;
+  int masterCount = count > 1 ? 1 : 0;
+  int stackCount  = count - masterCount;
+  int masterWidth = screen_width * 0.6 + resizeDelta;
+  if (masterWidth < 100) masterWidth = 100;
+  if (masterWidth > screen_width - 100) masterWidth = screen_width - 100;
   int stackWidth   = screen_width - masterWidth;
   int masterHeight = screen_height / masterCount;
   int stackHeight  = screen_height / stackCount;
-
   if (count == 1) {
     XMoveResizeWindow(dpy, d->windows[0], 0, 0, screen_width, screen_height);
     XRaiseWindow(dpy, d->windows[0]);
     return;
   }
-
   if (masterCount > 0) {
     XMoveResizeWindow(dpy, d->windows[0], 0, 0, masterWidth, masterHeight);
   }
