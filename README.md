@@ -13,14 +13,15 @@ MWM (Minimal Window Manager) is a lightweight, minimalistic window manager writt
 ## Getting Started
 
 ### Media Keys
-There are two diffrent approaches available for media keys. You can use either (`audio.c`) or (`audio.sh`), in Makefile you can choose which one to use:
+Below are two examples for handling media keys. You can modify these to suit your needs. To use them out of the box, you will need [herbe](https://github.com/dudik/herbe). Or modify (`notifications_daemon="/usr/local/bin/herbe"`) or (`#define NOTIFICATIONS_DAEMON "/usr/local/bin/herbe"`)
 ```bash
 -DAUDIO_SCRIPT="\"$(shell pwd)/audio.sh\""
 ```
-or:
+or (after compiling `gcc audio.sh -o audio`):
 ```bash
 -DAUDIO_SCRIPT="\"$(shell pwd)/audio\""
 ```
+
 
 ### Keyboard Shortcuts
 
