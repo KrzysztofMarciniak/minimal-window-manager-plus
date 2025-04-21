@@ -13,7 +13,8 @@ MWM (Minimal Window Manager) is a lightweight, minimalistic window manager writt
 ## Getting Started
 
 ### Media Keys
-Below are two examples for handling media keys. You can modify these to suit your needs. To use them out of the box, you will need [herbe](https://github.com/dudik/herbe). Or modify (`notifications_daemon="/usr/local/bin/herbe"`) or (`#define NOTIFICATIONS_DAEMON "/usr/local/bin/herbe"`)
+Below are two examples for handling media keys. You can modify these to suit your needs. To use them out of the box, you will need [herbe](https://github.com/dudik/herbe), or modify (`notifications_daemon="/usr/local/bin/herbe"` - .sh) or (`#define NOTIFICATIONS_DAEMON "/usr/local/bin/herbe"` - .c)
+Makefile:
 ```bash
 -DAUDIO_SCRIPT="\"$(shell pwd)/audio.sh\""
 ```
