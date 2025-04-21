@@ -15,30 +15,15 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-static short resizeDelta = 0;
 #define RESIZE_STEP 50
 #define MAX_DESKTOPS 9
 #define MAX_WINDOWS_PER_DESKTOP 6
 #define MOD_KEY Mod4Mask
 
 typedef struct {
-  Window windows[MAX_WINDOWS_PER_DESKTOP];
-  unsigned char windowCount;
-  unsigned char focusedIdx;
-  bool isMapped[MAX_WINDOWS_PER_DESKTOP];
-} Desktop;
-
-typedef struct {
   KeySym keysym;
   const char *command;
 } AppLauncher;
-
-static Display *dpy;
-static Window root;
-static Desktop desktops[MAX_DESKTOPS];
-static unsigned char currentDesktop  = 0;
-static volatile sig_atomic_t running = 1;
-static unsigned short screen_width, screen_height;
 
 static const AppLauncher launchers[] = {{XK_Return, "st"},
                                         {XK_p,
@@ -48,7 +33,18 @@ static const AppLauncher launchers[] = {{XK_Return, "st"},
                                         {XF86XK_AudioLowerVolume, AUDIO_SCRIPT " -"},
                                         {XF86XK_AudioMicMute, AUDIO_SCRIPT " mic"},
                                         {XF86XK_AudioMute, AUDIO_SCRIPT " aud"}};
-
+typedef struct {
+  Window windows[MAX_WINDOWS_PER_DESKTOP];
+  unsigned char windowCount;
+  unsigned char focusedIdx;
+  bool isMapped[MAX_WINDOWS_PER_DESKTOP];
+} Desktop;
+static Display *dpy;
+static Window root;
+static Desktop desktops[MAX_DESKTOPS];
+static unsigned char currentDesktop  = 0;
+static volatile sig_atomic_t running = 1;
+static unsigned short screen_width, screen_height;
 static void setup(void);
 static void run(void);
 static void cleanup(void);
@@ -71,6 +67,8 @@ static void handleMapNotify(XEvent *e);
 inline static void die(const char *msg);
 static inline int detachWindow(Window w, Window *windows, unsigned char *windowCount,
                                unsigned char *focusedIdx);
+
+static short resizeDelta = 0;
 int main(void) {
   signal(SIGTERM, sigHandler);
   signal(SIGINT, sigHandler);
