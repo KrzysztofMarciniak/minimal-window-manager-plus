@@ -18,7 +18,7 @@ MWM (Minimal Window Manager) is a lightweight, minimalistic window manager writt
 - **Mod + q**: Close focused window
 - **Mod + Shift + q**: Exit MWM
 - **Mod + j**: Focus left window
-- **Mod + l**: Focus right window
+- **Mod + k**: Focus right window
 - **Mod + Shift + l**: Increase window size
 - **Mod + Shift + h**: Decrease window size
 

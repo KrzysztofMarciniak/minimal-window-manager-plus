@@ -246,7 +246,7 @@ static void handleKeyPress(XEvent *e) {
     return;
   }
   if ((keysym == XK_j || keysym == XK_k) && state == MOD_KEY) {
-    focusCycleWindow(keysym == XK_k ? 1 : -1);
+    focusCycleWindow(keysym == XK_j ? 1 : -1);
     return;
   }
   if (keysym >= XK_1 && keysym <= XK_9) {
