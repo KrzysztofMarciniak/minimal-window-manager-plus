@@ -11,6 +11,17 @@ MWM (Minimal Window Manager) is a lightweight, minimalistic window manager writt
 * One file.
 
 ## Getting Started
+
+### Media Keys
+There are two diffrent approaches available for media keys. You can use either (`audio.c`) or (`audio.sh`), in Makefile you can choose which one to use:
+```bash
+-DAUDIO_SCRIPT="\"$(shell pwd)/audio.sh\""
+```
+or:
+```bash
+-DAUDIO_SCRIPT="\"$(shell pwd)/audio\""
+```
+
 ### Keyboard Shortcuts
 
 #### Window Management
