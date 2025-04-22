@@ -5,7 +5,6 @@ MWM (Minimal Window Manager) is a lightweight, minimalistic window manager writt
 * < 500 lines of code (clang-formatted).
 * High Performance.
 * No status bar.
-* No borders or gaps between windows.
 * No floating windows.
 * No compiler warnings, clean builds only.
 * One file.
