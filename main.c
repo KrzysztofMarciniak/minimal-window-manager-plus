@@ -5,12 +5,10 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/select.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
 #define RESIZE_STEP 50
@@ -35,7 +33,7 @@ typedef struct {
   Window windows[MAX_WINDOWS_PER_DESKTOP];
   unsigned char windowCount;
   unsigned char focusedIdx;
-  bool isMapped[MAX_WINDOWS_PER_DESKTOP];
+  _Bool isMapped[MAX_WINDOWS_PER_DESKTOP];
 } Desktop;
 static Display *dpy;
 static Window root;
@@ -283,7 +281,7 @@ static void moveWindowToDesktop(Window win, unsigned char desktop) {
     }
   }
   if (windowIdx == -1) return;
-  bool wasMapped = current->isMapped[windowIdx];
+  _Bool wasMapped = current->isMapped[windowIdx];
   if (!detachWindowFromDesktop(win, current)) return;
   int newIdx               = target->windowCount;
   target->windows[newIdx]  = win;
@@ -298,7 +296,7 @@ static void handleUnmapNotify(XEvent *e) {
   Desktop *d = &desktops[currentDesktop];
   for (unsigned char i = 0; i < d->windowCount; i++) {
     if (d->windows[i] == win) {
-      d->isMapped[i] = false;
+      d->isMapped[i] = 0;
       XUnmapWindow(dpy, win);
       if (i == d->focusedIdx && d->windowCount > 1) {
         d->focusedIdx = (i + 1) % d->windowCount;
@@ -319,7 +317,7 @@ static void handleDestroyNotify(XEvent *e) {
   Desktop *d = &desktops[currentDesktop];
   for (unsigned char i = 0; i < d->windowCount; i++) {
     if (d->windows[i] == win) {
-      d->isMapped[i] = false;
+      d->isMapped[i] = 0;
       d->windowCount--;
       for (unsigned char j = i; j < d->windowCount; j++) {
         d->windows[j]  = d->windows[j + 1];
@@ -369,7 +367,7 @@ static void mapWindowToDesktop(Window win) {
   if (d->windowCount < MAX_WINDOWS_PER_DESKTOP) {
     int idx          = d->windowCount;
     d->windows[idx]  = win;
-    d->isMapped[idx] = true;
+    d->isMapped[idx] = 1;
     d->windowCount++;
     d->focusedIdx = idx;
     XMapWindow(dpy, win);
@@ -402,7 +400,7 @@ static void handleMapNotify(XEvent *e) {
   Desktop *d    = &desktops[currentDesktop];
   for (unsigned char i = 0; i < d->windowCount; i++) {
     if (d->windows[i] == ev->window && !d->isMapped[i]) {
-      d->isMapped[i] = true;
+      d->isMapped[i] = 1;
       tileWindows();
       break;
     }
