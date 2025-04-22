@@ -7,7 +7,6 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/select.h>
 #include <unistd.h>
 
@@ -199,7 +198,9 @@ static void killFocusedWindow(void) {
   }
   XEvent ev;
 send:
-  memset(&ev, 0, sizeof(ev));
+for (long unsigned int i = 0; i < sizeof(ev) / sizeof(long); i++) {
+  ((long *)&ev)[i] = 0;
+}
   ev.type                 = ClientMessage;
   ev.xclient.window       = win;
   ev.xclient.message_type = XInternAtom(dpy, "WM_PROTOCOLS", False);
