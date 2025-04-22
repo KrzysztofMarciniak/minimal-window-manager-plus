@@ -1,11 +1,9 @@
 #include <X11/XF86keysym.h>
 #include <X11/XKBlib.h>
 #include <X11/Xlib.h>
-#include <X11/cursorfont.h>
 #include <X11/keysym.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <math.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -105,7 +103,7 @@ static void setup(void) {
   screen_height = attr.height;
   XSetErrorHandler(xerrorstart);
   XSelectInput(dpy, root, SubstructureRedirectMask | SubstructureNotifyMask | StructureNotifyMask);
-  Cursor cursor = XCreateFontCursor(dpy, XC_left_ptr);
+  Cursor cursor = XCreateFontCursor(dpy, 68);
   XDefineCursor(dpy, root, cursor);
   XSync(dpy, False);
   XSetErrorHandler(xerror);
