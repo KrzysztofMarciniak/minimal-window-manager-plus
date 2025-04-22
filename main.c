@@ -349,7 +349,7 @@ static void tileWindows(void) {
   if (count == 0) return;
   unsigned char masterCount = count > 1 ? 1 : 0;
   unsigned char stackCount  = count - masterCount;
-  int masterWidth = screen_width * 0.6 + resizeDelta;
+  int masterWidth = (screen_width + (resizeDelta << 1)) >> 1;
   if (masterWidth < 100) masterWidth = 100;
   if (masterWidth > screen_width - 100) masterWidth = screen_width - 100;
   int stackWidth   = screen_width - masterWidth;
