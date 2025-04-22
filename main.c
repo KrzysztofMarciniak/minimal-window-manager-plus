@@ -62,7 +62,7 @@ static void focusCycleWindow(int);
 static void handleMapNotify(XEvent *e);
 inline static void die(const char *msg);
 static inline int detachWindow(Window w, Window *windows, unsigned char *windowCount,
-                               unsigned char *focusedIdx);
+                               unsigned char *focusedIdx, _Bool *isMapped);
 
 static short resizeDelta = 0;
 int main(void) {
@@ -94,7 +94,14 @@ static void setup(void) {
   if (!getenv("DISPLAY")) die("DISPLAY not set");
   if (!(dpy = XOpenDisplay(NULL))) die("cannot open display");
   root = DefaultRootWindow(dpy);
-  memset(desktops, 0, sizeof(desktops));
+  for (unsigned char i = 0; i < MAX_DESKTOPS; i++) {
+    desktops[i].windowCount = 0;
+    desktops[i].focusedIdx  = 0;
+    for (unsigned char j = 0; j < MAX_WINDOWS_PER_DESKTOP; j++) {
+      desktops[i].windows[j]  = None;
+      desktops[i].isMapped[j] = 0;
+    }
+  }
   XWindowAttributes attr;
   XGetWindowAttributes(dpy, root, &attr);
   screen_width  = attr.width;
@@ -266,7 +273,7 @@ static void handleKeyPress(XEvent *e) {
   }
 }
 static inline int detachWindowFromDesktop(Window w, Desktop *d) {
-  return detachWindow(w, d->windows, &d->windowCount, &d->focusedIdx);
+  return detachWindow(w, d->windows, &d->windowCount, &d->focusedIdx, NULL);
 }
 static void moveWindowToDesktop(Window win, unsigned char desktop) {
   if (desktop >= MAX_DESKTOPS || desktop == currentDesktop) return;
@@ -338,10 +345,10 @@ static void cleanup(void) {
 }
 static void tileWindows(void) {
   Desktop *d = &desktops[currentDesktop];
-  int count  = d->windowCount;
+  unsigned char count  = d->windowCount;
   if (count == 0) return;
-  int masterCount = count > 1 ? 1 : 0;
-  int stackCount  = count - masterCount;
+  unsigned char masterCount = count > 1 ? 1 : 0;
+  unsigned char stackCount  = count - masterCount;
   int masterWidth = screen_width * 0.6 + resizeDelta;
   if (masterWidth < 100) masterWidth = 100;
   if (masterWidth > screen_width - 100) masterWidth = screen_width - 100;
@@ -356,7 +363,7 @@ static void tileWindows(void) {
   if (masterCount > 0) {
     XMoveResizeWindow(dpy, d->windows[0], 0, 0, masterWidth, masterHeight);
   }
-  for (int i = 0; i < stackCount; i++) {
+  for (unsigned char i = 0; i < stackCount; i++) {
     XMoveResizeWindow(dpy, d->windows[i + masterCount], masterWidth, i * stackHeight, stackWidth,
                       stackHeight);
   }
@@ -383,11 +390,15 @@ static void handleMapRequest(XEvent *e) {
   mapWindowToDesktop(ev->window);
 }
 static inline int detachWindow(Window w, Window *windows, unsigned char *windowCount,
-                               unsigned char *focusedIdx) {
+                               unsigned char *focusedIdx, _Bool *isMapped) {
   for (unsigned char i = 0; i < *windowCount; i++) {
     if (windows[i] == w) {
-      if (i < *windowCount - 1)
-        memmove(&windows[i], &windows[i + 1], (*windowCount - i - 1) * sizeof(Window));
+      if (i < *windowCount - 1) {
+        for (unsigned char j = i; j < *windowCount - 1; j++) {
+          windows[j]  = windows[j + 1];
+          isMapped[j] = isMapped[j + 1];
+        }
+      }
       (*windowCount)--;
       if (*focusedIdx >= *windowCount) *focusedIdx = *windowCount ? *windowCount - 1 : 0;
       return 1;
