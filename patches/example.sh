@@ -1,0 +1,1 @@
+patch ../main.c < useless_gaps_and_borders.patch
