@@ -9,6 +9,9 @@ MWM+ Expanded version of [MWM](https://github.com/KrzysztofMarciniak/minimal-win
 ![Status Bar](screenshots/status_bar.png)
 ![Different Windows](screenshots/diffrent_windows.png)
 ![One Window](screenshots/one_window.png)
+### Expnaded Status Bar
+![Expnaded Status Bar](screenshots/expanded_branch.png)
+[Expanded Status Bar Branch](https://github.com/KrzysztofMarciniak/minimal-window-manager-plus/tree/expanded-status-bar)
 ## Getting Started
 
 ### Media Keys
