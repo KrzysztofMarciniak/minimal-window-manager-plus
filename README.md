@@ -5,11 +5,7 @@ MWM+ Expanded version of [MWM](https://github.com/KrzysztofMarciniak/minimal-win
 * Status Bar
 * Gaps and Borders
 
-## Screenshots
-![Status Bar](screenshots/status_bar.png)
-![Different Windows](screenshots/diffrent_windows.png)
-![One Window](screenshots/one_window.png)
-## Getting Started
+# Getting Started
 
 ### Media Keys
 Below are two examples for handling media keys. You can modify these to suit your needs. To use them out of the box, you will need [herbe](https://github.com/dudik/herbe), or modify (`notifications_daemon="/usr/local/bin/herbe"` - .sh) or (`#define NOTIFICATIONS_DAEMON "/usr/local/bin/herbe"` - .c)

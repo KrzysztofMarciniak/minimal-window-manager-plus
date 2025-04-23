@@ -2,7 +2,11 @@
 #include <X11/XKBlib.h>
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
+#include <arpa/inet.h>
 #include <fcntl.h>
+#include <ifaddrs.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,10 +16,6 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
-#include <ifaddrs.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>    
 
 #define STATUS_BAR_HEIGHT 20
 #define RESIZE_STEP 50
@@ -83,14 +83,14 @@ int main(void) {
   cleanup();
 }
 static char *getCurrentTime() {
-  static char timeStr[6];
+  static char timeStr[9];
   time_t t = time(NULL);
   struct tm tm_info;
   if (localtime_r(&t, &tm_info) == NULL) {
     timeStr[0] = '\0';
     return timeStr;
   }
-  strftime(timeStr, sizeof(timeStr), "%H:%M", &tm_info);
+  strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &tm_info);
   return timeStr;
 }
 static char *getMemoryUsage() {
@@ -120,7 +120,7 @@ static char *getMemoryUsage() {
   if (totalMemoryKB == 0) {
     snprintf(memoryStatus, sizeof(memoryStatus), "m: Unknown");
   } else {
-    unsigned long usedMemoryKB = totalMemoryKB - (freeMemoryKB + buffersKB + cachedKB);
+    unsigned long usedMemoryKB      = totalMemoryKB - (freeMemoryKB + buffersKB + cachedKB);
     unsigned long memoryUtilization = (usedMemoryKB * 100) / totalMemoryKB;
     snprintf(memoryStatus, sizeof(memoryStatus), "m: %lu%%", memoryUtilization);
   }
@@ -137,31 +137,33 @@ static char *getCPUUsage() {
     snprintf(cpuStatus, sizeof(cpuStatus), "CPU: Unknown");
     return cpuStatus;
   }
-  if (fscanf(cpuFile, "cpu %lu %lu %lu %lu %lu %lu %lu", &user1, &nice1, &system1, &idle1, &iowait1, &irq1, &softirq1) != 7) {
+  if (fscanf(cpuFile, "cpu %lu %lu %lu %lu %lu %lu %lu", &user1, &nice1, &system1, &idle1, &iowait1,
+             &irq1, &softirq1) != 7) {
     fclose(cpuFile);
     snprintf(cpuStatus, sizeof(cpuStatus), "CPU: Error reading stats");
     return cpuStatus;
   }
   fclose(cpuFile);
-  struct timespec ts = {0, 100000000}; 
+  struct timespec ts = {0, 100000000};
   nanosleep(&ts, NULL);
   cpuFile = fopen("/proc/stat", "r");
   if (!cpuFile) {
     snprintf(cpuStatus, sizeof(cpuStatus), "cpu: Unknown");
     return cpuStatus;
   }
-  if (fscanf(cpuFile, "cpu %lu %lu %lu %lu %lu %lu %lu", &user2, &nice2, &system2, &idle2, &iowait2, &irq2, &softirq2) != 7) {
+  if (fscanf(cpuFile, "cpu %lu %lu %lu %lu %lu %lu %lu", &user2, &nice2, &system2, &idle2, &iowait2,
+             &irq2, &softirq2) != 7) {
     fclose(cpuFile);
     snprintf(cpuStatus, sizeof(cpuStatus), "cpu: Error reading stats");
     return cpuStatus;
   }
   fclose(cpuFile);
-  total1 = user1 + nice1 + system1 + idle1 + iowait1 + irq1 + softirq1;
-  total2 = user2 + nice2 + system2 + idle2 + iowait2 + irq2 + softirq2;
-  idleTime1 = idle1 + iowait1;
-  idleTime2 = idle2 + iowait2;
+  total1                  = user1 + nice1 + system1 + idle1 + iowait1 + irq1 + softirq1;
+  total2                  = user2 + nice2 + system2 + idle2 + iowait2 + irq2 + softirq2;
+  idleTime1               = idle1 + iowait1;
+  idleTime2               = idle2 + iowait2;
   unsigned long totalDiff = total2 - total1;
-  unsigned long idleDiff = idleTime2 - idleTime1;
+  unsigned long idleDiff  = idleTime2 - idleTime1;
   if (totalDiff == 0) {
     snprintf(cpuStatus, sizeof(cpuStatus), "cpu: Unknown");
     return cpuStatus;
@@ -183,8 +185,9 @@ static char *getNetworkInfo() {
   for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
     if (ifa->ifa_addr == NULL) continue;
     family = ifa->ifa_addr->sa_family;
-    if (family == AF_INET) {  
-      n = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+    if (family == AF_INET) {
+      n = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), host, NI_MAXHOST, NULL, 0,
+                      NI_NUMERICHOST);
       if (n == 0 && strcmp(ifa->ifa_name, "lo") != 0) {
         snprintf(networkStatus, sizeof(networkStatus), "n: %s (%s)", ifa->ifa_name, host);
         break;
@@ -221,22 +224,19 @@ static char *getBatteryStatus() {
   return batteryStatus;
 }
 static void drawStatusBar() {
-  char status[512];  
-  snprintf(status, sizeof(status), 
-           "%s | %s | %s | %s | %s",
-           getCurrentTime(),
-           getBatteryStatus(),
-           getMemoryUsage(),
-           getCPUUsage(),
-           getNetworkInfo());
+  char status[512];
+  snprintf(status, sizeof(status), "%s | %s | %s | %s | %s", getCurrentTime(), getBatteryStatus(),
+           getMemoryUsage(), getCPUUsage(), getNetworkInfo());
   if (strcmp(status, previousStatus) != 0) {
     unsigned long backgroundColor = COLOR_B;
     unsigned long textColor       = COLOR_A;
     XSetForeground(dpy, DefaultGC(dpy, 0), backgroundColor);
-    XFillRectangle(dpy, root, DefaultGC(dpy, 0), 0, screen_height - STATUS_BAR_HEIGHT, screen_width, STATUS_BAR_HEIGHT);
+    XFillRectangle(dpy, root, DefaultGC(dpy, 0), 0, screen_height - STATUS_BAR_HEIGHT, screen_width,
+                   STATUS_BAR_HEIGHT);
     XSetForeground(dpy, DefaultGC(dpy, 0), textColor);
-    XDrawString(dpy, root, DefaultGC(dpy, 0), 10, screen_height - STATUS_BAR_HEIGHT + 15, status, strlen(status));
-   strncpy(previousStatus, status, sizeof(previousStatus) - 1);
+    XDrawString(dpy, root, DefaultGC(dpy, 0), 10, screen_height - STATUS_BAR_HEIGHT + 15, status,
+                strlen(status));
+    strncpy(previousStatus, status, sizeof(previousStatus) - 1);
   }
 }
 inline static void die(const char *msg) {
