@@ -2,24 +2,30 @@
 #include <X11/XKBlib.h>
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/select.h>
+#include <sys/statvfs.h>
+#include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
-
+#define STATUS_BAR_HEIGHT 20
 #define RESIZE_STEP 50
 #define MAX_DESKTOPS 9
 #define MAX_WINDOWS_PER_DESKTOP 6
 #define MOD_KEY Mod4Mask
+#define GAP_SIZE 10
+#define BORDER_WIDTH 1
+#define COLOR_A 0xFFFFFF
+#define COLOR_B 0x000000
 
 typedef struct {
   KeySym keysym;
   const char *command;
 } AppLauncher;
-
 static const AppLauncher launchers[] = {{XK_Return, "st"},
                                         {XK_p,
                                          "dmenu_run -m '0' -nb '#000000' -nf '#ffffff' -sb "
@@ -62,14 +68,66 @@ static void handleMapNotify(XEvent *e);
 inline static void die(const char *msg);
 static inline int detachWindow(Window w, Window *windows, unsigned char *windowCount,
                                unsigned char *focusedIdx, _Bool *isMapped);
-
-static short resizeDelta = 0;
+static char previousStatus[256] = "";
+static short resizeDelta        = 0;
 int main(void) {
   signal(SIGTERM, sigHandler);
   signal(SIGINT, sigHandler);
   setup();
   run();
   cleanup();
+}
+static char *getCurrentTime() {
+  static char timeStr[9];
+  time_t t = time(NULL);
+  struct tm tm_info;
+  if (localtime_r(&t, &tm_info) == NULL) {
+    timeStr[0] = '\0';
+    return timeStr;
+  }
+  strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &tm_info);
+  return timeStr;
+}
+static char *getBatteryStatus() {
+  static char batteryStatus[64];
+  FILE *capacityFile = fopen("/sys/class/power_supply/BAT0/capacity", "r");
+  FILE *statusFile   = fopen("/sys/class/power_supply/BAT0/status", "r");
+  if (!capacityFile || !statusFile) {
+    snprintf(batteryStatus, sizeof(batteryStatus), "Battery: Unknown");
+    if (capacityFile) fclose(capacityFile);
+    if (statusFile) fclose(statusFile);
+    return batteryStatus;
+  }
+  int capacity;
+  char status[16];
+  if (fscanf(capacityFile, "%d", &capacity) != 1) {
+    capacity = -1;
+  }
+  if (fscanf(statusFile, "%15s", status) != 1) {
+    status[0] = '\0';
+  }
+  fclose(capacityFile);
+  fclose(statusFile);
+  snprintf(batteryStatus, sizeof(batteryStatus), "Battery: %d%%%s", capacity,
+           strcmp(status, "Charging") == 0      ? " (char)"
+           : strcmp(status, "Discharging") == 0 ? " (dis)"
+                                                : "");
+  return batteryStatus;
+}
+static void drawStatusBar() {
+  char status[256];
+  snprintf(status, sizeof(status), "%s | %s ", getCurrentTime(), getBatteryStatus());
+  if (strcmp(status, previousStatus) != 0) {
+    unsigned long backgroundColor = COLOR_B;
+    unsigned long textColor       = COLOR_A;
+    XSetForeground(dpy, DefaultGC(dpy, 0), backgroundColor);
+    XFillRectangle(dpy, root, DefaultGC(dpy, 0), 0, screen_height - STATUS_BAR_HEIGHT, screen_width,
+                   STATUS_BAR_HEIGHT);
+    XSetForeground(dpy, DefaultGC(dpy, 0), textColor);
+    XDrawString(dpy, root, DefaultGC(dpy, 0), 10, screen_height - STATUS_BAR_HEIGHT + 15, status,
+                strlen(status));
+    strncpy(previousStatus, status, sizeof(previousStatus) - 1);
+  }
 }
 inline static void die(const char *msg) {
   fprintf(stderr, "mwm: %s\n", msg);
@@ -144,6 +202,10 @@ static void run(void) {
   XEvent e;
   fd_set fds;
   int xfd = ConnectionNumber(dpy);
+
+  struct timeval last_draw, now;
+  gettimeofday(&last_draw, NULL);
+
   while (running) {
     while (XPending(dpy)) {
       XNextEvent(dpy, &e);
@@ -168,9 +230,18 @@ static void run(void) {
           break;
       }
     }
+    gettimeofday(&now, NULL);
+    long elapsed = (now.tv_sec - last_draw.tv_sec) * 1000000L + (now.tv_usec - last_draw.tv_usec);
+    if (elapsed >= 500000L) {
+      drawStatusBar();
+      last_draw = now;
+    }
+    struct timeval timeout;
+    timeout.tv_sec  = 0;
+    timeout.tv_usec = 100000;
     FD_ZERO(&fds);
     FD_SET(xfd, &fds);
-    if (select(xfd + 1, &fds, NULL, NULL, NULL) == -1 && errno != EINTR) break;
+    select(xfd + 1, &fds, NULL, NULL, &timeout);
   }
 }
 static void handleConfigureNotify(XEvent *e) {
@@ -198,9 +269,9 @@ static void killFocusedWindow(void) {
   }
   XEvent ev;
 send:
-for (long unsigned int i = 0; i < sizeof(ev) / sizeof(long); i++) {
-  ((long *)&ev)[i] = 0;
-}
+  for (long unsigned int i = 0; i < sizeof(ev) / sizeof(long); i++) {
+    ((long *)&ev)[i] = 0;
+  }
   ev.type                 = ClientMessage;
   ev.xclient.window       = win;
   ev.xclient.message_type = XInternAtom(dpy, "WM_PROTOCOLS", False);
@@ -298,7 +369,17 @@ static void moveWindowToDesktop(Window win, unsigned char desktop) {
   XUnmapWindow(dpy, win);
   tileWindows();
 }
-inline static void focusWindow(Window w) { XSetInputFocus(dpy, w, RevertToParent, CurrentTime); }
+inline static void focusWindow(Window w) {
+  XSetInputFocus(dpy, w, RevertToParent, CurrentTime);
+  for (unsigned char d = 0; d < MAX_DESKTOPS; d++) {
+    Desktop *desk = &desktops[d];
+    for (unsigned char i = 0; i < desk->windowCount; i++) {
+      unsigned long color = (desk->windows[i] == w) ? COLOR_A : COLOR_B;
+      XSetWindowBorderWidth(dpy, desk->windows[i], BORDER_WIDTH);
+      XSetWindowBorder(dpy, desk->windows[i], color);
+    }
+  }
+}
 static void handleUnmapNotify(XEvent *e) {
   Window win = e->xunmap.window;
   Desktop *d = &desktops[currentDesktop];
@@ -345,30 +426,49 @@ static void cleanup(void) {
   XCloseDisplay(dpy);
 }
 static void tileWindows(void) {
-  Desktop *d = &desktops[currentDesktop];
-  unsigned char count  = d->windowCount;
+  Desktop *d          = &desktops[currentDesktop];
+  unsigned char count = d->windowCount;
   if (count == 0) return;
-  unsigned char masterCount = count > 1 ? 1 : 0;
-  unsigned char stackCount  = count - masterCount;
-  int masterWidth = (screen_width + (resizeDelta << 1)) >> 1;
-  if (masterWidth < 100) masterWidth = 100;
-  if (masterWidth > screen_width - 100) masterWidth = screen_width - 100;
-  int stackWidth   = screen_width - masterWidth;
-  int masterHeight = screen_height / masterCount;
-  int stackHeight  = screen_height / stackCount;
   if (count == 1) {
-    XMoveResizeWindow(dpy, d->windows[0], 0, 0, screen_width, screen_height);
-    XRaiseWindow(dpy, d->windows[0]);
+    XMoveResizeWindow(dpy, d->windows[0], 0, 0, screen_width - 2 * BORDER_WIDTH,
+                      screen_height - STATUS_BAR_HEIGHT - 2 * BORDER_WIDTH);
+    d->isMapped[0] = 1;
+    XMapWindow(dpy, d->windows[0]);
+    focusWindow(d->windows[0]);
     return;
   }
-  if (masterCount > 0) {
-    XMoveResizeWindow(dpy, d->windows[0], 0, 0, masterWidth, masterHeight);
+  int masterCount  = count >= 1 ? 1 : 0;
+  int stackCount   = count - masterCount;
+  int totalGapV    = stackCount * GAP_SIZE;
+  int totalGapH    = 3 * GAP_SIZE;
+  int usableHeight = screen_height - STATUS_BAR_HEIGHT - totalGapV;
+  int masterWidth  = (screen_width + (resizeDelta << 1)) >> 1;
+  if (masterWidth < 100) masterWidth = 100;
+  if (masterWidth > screen_width - 100) masterWidth = screen_width - 100;
+  int stackWidth = screen_width - masterWidth - totalGapH;
+  masterWidth -= 2 * GAP_SIZE;
+  int masterHeight = masterCount > 0 ? usableHeight : 0;
+  int stackHeight  = stackCount > 0 ? usableHeight / stackCount : 0;
+  int x, y, w, h;
+  for (unsigned char i = 0; i < count; i++) {
+    if (!d->isMapped[i]) continue;
+    if (i == 0 && masterCount == 1) {
+      x = GAP_SIZE;
+      y = GAP_SIZE;
+      w = masterWidth - 2 * BORDER_WIDTH;
+      h = masterHeight - 2 * BORDER_WIDTH;
+    } else {
+      int stackIdx = i - 1;
+      x            = masterWidth + 2 * GAP_SIZE;
+      y            = GAP_SIZE + stackIdx * (stackHeight + GAP_SIZE);
+      w            = stackWidth - 2 * BORDER_WIDTH;
+      h            = stackHeight - 2 * BORDER_WIDTH;
+    }
+    XMoveResizeWindow(dpy, d->windows[i], x, y, w, h);
+    d->isMapped[i] = 1;
+    XMapWindow(dpy, d->windows[i]);
   }
-  for (unsigned char i = 0; i < stackCount; i++) {
-    XMoveResizeWindow(dpy, d->windows[i + masterCount], masterWidth, i * stackHeight, stackWidth,
-                      stackHeight);
-  }
-  XRaiseWindow(dpy, d->windows[0]);
+  focusWindow(d->windows[d->focusedIdx]);
 }
 static void mapWindowToDesktop(Window win) {
   Desktop *d = &desktops[currentDesktop];
