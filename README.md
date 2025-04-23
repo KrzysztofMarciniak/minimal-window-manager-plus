@@ -5,6 +5,10 @@ MWM+ Expanded version of [MWM](https://github.com/KrzysztofMarciniak/minimal-win
 * Status Bar
 * Gaps and Borders
 
+## Screenshots
+![Status Bar](screenshots/status_bar.png)
+![Different Windows](screenshots/diffrent_windows.png)
+![One Window](screenshots/one_window.png)
 ## Getting Started
 
 ### Media Keys
