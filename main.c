@@ -447,7 +447,7 @@ static void tileWindows(void) {
   if (masterWidth > screen_width - 100) masterWidth = screen_width - 100;
   int stackWidth = screen_width - masterWidth - totalGapH;
   masterWidth -= 2 * GAP_SIZE;
-  int masterHeight = screen_height - 0.7 * STATUS_BAR_HEIGHT - 2 * GAP_SIZE;
+  int masterHeight = screen_height - 0.5 * STATUS_BAR_HEIGHT - 2 * GAP_SIZE;
   int stackHeight  = stackCount > 0 ? (usableHeight / stackCount) : 0;
   int x, y, w, h;
   for (unsigned char i = 0; i < count; i++) {
@@ -461,7 +461,7 @@ static void tileWindows(void) {
       int stackIdx = i - 1;
       x            = masterWidth + 2 * GAP_SIZE;
       y            = GAP_SIZE + stackIdx * (stackHeight + GAP_SIZE);
-      w            = stackWidth - 2 * BORDER_WIDTH;
+      w            = stackWidth - 1.5 * BORDER_WIDTH;
       h            = stackHeight - 2 * BORDER_WIDTH;
     }
     XMoveResizeWindow(dpy, d->windows[i], x, y, w, h);
