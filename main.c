@@ -93,7 +93,7 @@ static char *getBatteryStatus() {
   FILE *capacityFile = fopen("/sys/class/power_supply/BAT0/capacity", "r");
   FILE *statusFile   = fopen("/sys/class/power_supply/BAT0/status", "r");
   if (!capacityFile || !statusFile) {
-    snprintf(batteryStatus, sizeof(batteryStatus), "Battery: Unknown");
+    snprintf(batteryStatus, sizeof(batteryStatus), "b: Unknown");
     if (capacityFile) fclose(capacityFile);
     if (statusFile) fclose(statusFile);
     return batteryStatus;
@@ -108,7 +108,7 @@ static char *getBatteryStatus() {
   }
   fclose(capacityFile);
   fclose(statusFile);
-  snprintf(batteryStatus, sizeof(batteryStatus), "Battery: %d%%%s", capacity,
+  snprintf(batteryStatus, sizeof(batteryStatus), "b: %d%%%s", capacity,
            strcmp(status, "Charging") == 0      ? " (char)"
            : strcmp(status, "Discharging") == 0 ? " (dis)"
                                                 : "");
