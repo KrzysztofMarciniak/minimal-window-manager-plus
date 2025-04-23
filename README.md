@@ -4,7 +4,7 @@ mwm+ Expanded version of [mwm](https://github.com/KrzysztofMarciniak/minimal-win
 
 * Status Bar
 * Gaps and Borders
-
+### Currently at 536 lines of code.
 ## Screenshots
 ![Status Bar](screenshots/status_bar.png)
 ![Different Windows](screenshots/diffrent_windows.png)
