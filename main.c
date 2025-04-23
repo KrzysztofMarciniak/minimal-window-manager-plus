@@ -447,8 +447,8 @@ static void tileWindows(void) {
   if (masterWidth > screen_width - 100) masterWidth = screen_width - 100;
   int stackWidth = screen_width - masterWidth - totalGapH;
   masterWidth -= 2 * GAP_SIZE;
-  int masterHeight = masterCount > 0 ? usableHeight : 0;
-  int stackHeight  = stackCount > 0 ? usableHeight / stackCount : 0;
+  int masterHeight = screen_height - 0.7 * STATUS_BAR_HEIGHT - 2 * GAP_SIZE;
+  int stackHeight  = stackCount > 0 ? (usableHeight / stackCount) : 0;
   int x, y, w, h;
   for (unsigned char i = 0; i < count; i++) {
     if (!d->isMapped[i]) continue;
