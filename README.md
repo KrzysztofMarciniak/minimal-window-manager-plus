@@ -1,6 +1,6 @@
-# Minimal Window Manager + (MWM)
+# Minimal Window Manager + (mwm+)
 
-MWM+ Expanded version of [MWM](https://github.com/KrzysztofMarciniak/minimal-window-manager) with extra features:
+mwm+ Expanded version of [mwm](https://github.com/KrzysztofMarciniak/minimal-window-manager) with extra features:
 
 * Status Bar
 * Gaps and Borders
