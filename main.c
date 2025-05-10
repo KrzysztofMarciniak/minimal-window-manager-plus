@@ -68,6 +68,7 @@ static void handleMapNotify(XEvent *e);
 inline static void die(const char *msg);
 static inline int detachWindow(Window w, Window *windows, unsigned char *windowCount,
                                unsigned char *focusedIdx, _Bool *isMapped);
+static inline int detachWindowFromDesktop(Window w, Desktop *d);
 static char previousStatus[256] = "";
 static short resizeDelta        = 0;
 int main(void) {
@@ -344,9 +345,6 @@ static void handleKeyPress(XEvent *e) {
     }
   }
 }
-static inline int detachWindowFromDesktop(Window w, Desktop *d) {
-  return detachWindow(w, d->windows, &d->windowCount, &d->focusedIdx, NULL);
-}
 static void moveWindowToDesktop(Window win, unsigned char desktop) {
   if (desktop >= MAX_DESKTOPS || desktop == currentDesktop) return;
   Desktop *target = &desktops[desktop];
@@ -490,18 +488,30 @@ static void handleMapRequest(XEvent *e) {
   XMapRequestEvent *ev = &e->xmaprequest;
   mapWindowToDesktop(ev->window);
 }
+static inline int detachWindowFromDesktop(Window w, Desktop *d) {
+  if (!d) return 0;
+  if (currentDesktop >= MAX_DESKTOPS || d->windowCount > MAX_WINDOWS_PER_DESKTOP) return 0;
+  return detachWindow(w, d->windows, &d->windowCount, &d->focusedIdx, d->isMapped);
+}
 static inline int detachWindow(Window w, Window *windows, unsigned char *windowCount,
                                unsigned char *focusedIdx, _Bool *isMapped) {
-  for (unsigned char i = 0; i < *windowCount; i++) {
+  if (!windows || !windowCount || !focusedIdx) return 0;
+  unsigned char count = *windowCount;
+  if (count == 0 || count > MAX_WINDOWS_PER_DESKTOP) return 0;
+  for (unsigned char i = 0; i < count; i++) {
     if (windows[i] == w) {
-      if (i < *windowCount - 1) {
-        for (unsigned char j = i; j < *windowCount - 1; j++) {
-          windows[j]  = windows[j + 1];
-          isMapped[j] = isMapped[j + 1];
+      if (i < count - 1) {
+        for (unsigned char j = i; j < count - 1; j++) {
+          windows[j] = windows[j + 1];
+          if (isMapped) {
+            isMapped[j] = isMapped[j + 1];
+          }
         }
       }
-      (*windowCount)--;
-      if (*focusedIdx >= *windowCount) *focusedIdx = *windowCount ? *windowCount - 1 : 0;
+      *windowCount = count - 1;
+      if (*focusedIdx >= *windowCount) {
+        *focusedIdx = *windowCount ? (*windowCount - 1) : 0;
+      }
       return 1;
     }
   }
