@@ -73,6 +73,7 @@ static void handleMapNotify(XEvent *e);
 inline static void die(const char *msg);
 static inline int detachWindow(Window w, Window *windows, unsigned char *windowCount,
                                unsigned char *focusedIdx, _Bool *isMapped);
+static inline int detachWindowFromDesktop(Window w, Desktop *d);
 static char previousStatus[256] = "";
 static short resizeDelta        = 0;
 int main(void) {
@@ -83,14 +84,14 @@ int main(void) {
   cleanup();
 }
 static char *getCurrentTime() {
-  static char timeStr[9];
+  static char timeStr[20];
   time_t t = time(NULL);
   struct tm tm_info;
   if (localtime_r(&t, &tm_info) == NULL) {
     timeStr[0] = '\0';
     return timeStr;
   }
-  strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &tm_info);
+  strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &tm_info);
   return timeStr;
 }
 static char *getMemoryUsage() {
@@ -172,7 +173,6 @@ static char *getCPUUsage() {
   snprintf(cpuStatus, sizeof(cpuStatus), "cpu: %lu%%", cpuUsage);
   return cpuStatus;
 }
-
 static char *getNetworkInfo() {
   static char networkStatus[128];
   struct ifaddrs *ifaddr, *ifa;
@@ -312,10 +312,8 @@ static void run(void) {
   XEvent e;
   fd_set fds;
   int xfd = ConnectionNumber(dpy);
-
   struct timeval last_draw, now;
   gettimeofday(&last_draw, NULL);
-
   while (running) {
     while (XPending(dpy)) {
       XNextEvent(dpy, &e);
@@ -453,9 +451,6 @@ static void handleKeyPress(XEvent *e) {
       return;
     }
   }
-}
-static inline int detachWindowFromDesktop(Window w, Desktop *d) {
-  return detachWindow(w, d->windows, &d->windowCount, &d->focusedIdx, NULL);
 }
 static void moveWindowToDesktop(Window win, unsigned char desktop) {
   if (desktop >= MAX_DESKTOPS || desktop == currentDesktop) return;
@@ -600,18 +595,30 @@ static void handleMapRequest(XEvent *e) {
   XMapRequestEvent *ev = &e->xmaprequest;
   mapWindowToDesktop(ev->window);
 }
+static inline int detachWindowFromDesktop(Window w, Desktop *d) {
+  if (!d) return 0;
+  if (currentDesktop >= MAX_DESKTOPS || d->windowCount > MAX_WINDOWS_PER_DESKTOP) return 0;
+  return detachWindow(w, d->windows, &d->windowCount, &d->focusedIdx, d->isMapped);
+}
 static inline int detachWindow(Window w, Window *windows, unsigned char *windowCount,
                                unsigned char *focusedIdx, _Bool *isMapped) {
-  for (unsigned char i = 0; i < *windowCount; i++) {
+  if (!windows || !windowCount || !focusedIdx) return 0;
+  unsigned char count = *windowCount;
+  if (count == 0 || count > MAX_WINDOWS_PER_DESKTOP) return 0;
+  for (unsigned char i = 0; i < count; i++) {
     if (windows[i] == w) {
-      if (i < *windowCount - 1) {
-        for (unsigned char j = i; j < *windowCount - 1; j++) {
-          windows[j]  = windows[j + 1];
-          isMapped[j] = isMapped[j + 1];
+      if (i < count - 1) {
+        for (unsigned char j = i; j < count - 1; j++) {
+          windows[j] = windows[j + 1];
+          if (isMapped) {
+            isMapped[j] = isMapped[j + 1];
+          }
         }
       }
-      (*windowCount)--;
-      if (*focusedIdx >= *windowCount) *focusedIdx = *windowCount ? *windowCount - 1 : 0;
+      *windowCount = count - 1;
+      if (*focusedIdx >= *windowCount) {
+        *focusedIdx = *windowCount ? (*windowCount - 1) : 0;
+      }
       return 1;
     }
   }
