@@ -76,7 +76,7 @@ inline static void die(const char *msg);
 static inline int detachWindow(Window w, Window *windows, unsigned char *windowCount,
                                unsigned char *focusedIdx, _Bool *isMapped);
 static inline int detachWindowFromDesktop(Window w, Desktop *d);
-static short resizeDelta = 0;
+static short resizeDelta        = 0;
 static char previousStatus[512] = "";
 int main(void) {
   signal(SIGTERM, sigHandler);
@@ -206,7 +206,7 @@ static char *getBatteryStatus() {
 
   snprintf(batteryStatus, sizeof(batteryStatus), "b: %d%%%s", capacity,
            (strcmp(status, "Charging") == 0)      ? " (chr)"
-           : (strcmp(status, "Discharging") == 0) ? " (dsg)"
+           : (strcmp(status, "Discharging") == 0) ? " (dis)"
                                                   : "");
   return batteryStatus;
 }
@@ -255,21 +255,13 @@ static void setup(void) {
     XSetWindowAttributes wa;
     wa.override_redirect = True;
     wa.background_pixel  = COLOR_B;
-    barWindow = XCreateWindow(
-        dpy,
-        root,
-        0, screen_height - STATUS_BAR_HEIGHT, 
-        screen_width, STATUS_BAR_HEIGHT,
-        0,
-        DefaultDepth(dpy, DefaultScreen(dpy)),
-        CopyFromParent,
-        DefaultVisual(dpy, DefaultScreen(dpy)),
-        CWOverrideRedirect | CWBackPixel,
-        &wa
-    );
+    barWindow = XCreateWindow(dpy, root, 0, screen_height - STATUS_BAR_HEIGHT, screen_width,
+                              STATUS_BAR_HEIGHT, 0, DefaultDepth(dpy, DefaultScreen(dpy)),
+                              CopyFromParent, DefaultVisual(dpy, DefaultScreen(dpy)),
+                              CWOverrideRedirect | CWBackPixel, &wa);
     XMapWindow(dpy, barWindow);
     XRaiseWindow(dpy, barWindow);
-}
+  }
   XSetErrorHandler(xerrorstart);
   XSelectInput(dpy, root, SubstructureRedirectMask | SubstructureNotifyMask | StructureNotifyMask);
   Cursor cursor = XCreateFontCursor(dpy, 68);
