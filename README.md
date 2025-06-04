@@ -7,6 +7,9 @@ MWM+ Expanded version of [MWM](https://github.com/KrzysztofMarciniak/minimal-win
 * Status Bar
 * Gaps and Borders
 
+![main](screenshots/main.png)
+![tiling](screenshots/tiling.png)
+
 # Getting Started
 
 ### Media Keys
