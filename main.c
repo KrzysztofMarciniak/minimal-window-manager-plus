@@ -46,6 +46,8 @@ typedef struct {
   _Bool isMapped[MAX_WINDOWS_PER_DESKTOP];
 } Desktop;
 static Display *dpy;
+static _Bool IsSwitching = False;
+static Window barWindow;
 static Window root;
 static Desktop desktops[MAX_DESKTOPS];
 static unsigned char currentDesktop  = 0;
@@ -74,8 +76,8 @@ inline static void die(const char *msg);
 static inline int detachWindow(Window w, Window *windows, unsigned char *windowCount,
                                unsigned char *focusedIdx, _Bool *isMapped);
 static inline int detachWindowFromDesktop(Window w, Desktop *d);
-static char previousStatus[256] = "";
-static short resizeDelta        = 0;
+static short resizeDelta = 0;
+static char previousStatus[512] = "";
 int main(void) {
   signal(SIGTERM, sigHandler);
   signal(SIGINT, sigHandler);
@@ -104,18 +106,10 @@ static char *getMemoryUsage() {
   unsigned long totalMemoryKB = 0, freeMemoryKB = 0, buffersKB = 0, cachedKB = 0;
   char line[256];
   while (fgets(line, sizeof(line), memInfo)) {
-    if (sscanf(line, "MemTotal: %lu kB", &totalMemoryKB) == 1) {
-      continue;
-    }
-    if (sscanf(line, "MemFree: %lu kB", &freeMemoryKB) == 1) {
-      continue;
-    }
-    if (sscanf(line, "Buffers: %lu kB", &buffersKB) == 1) {
-      continue;
-    }
-    if (sscanf(line, "Cached: %lu kB", &cachedKB) == 1) {
-      break;
-    }
+    if (sscanf(line, "MemTotal: %lu kB", &totalMemoryKB) == 1) continue;
+    if (sscanf(line, "MemFree: %lu kB", &freeMemoryKB) == 1) continue;
+    if (sscanf(line, "Buffers: %lu kB", &buffersKB) == 1) continue;
+    if (sscanf(line, "Cached: %lu kB", &cachedKB) == 1) break;
   }
   fclose(memInfo);
   if (totalMemoryKB == 0) {
@@ -129,48 +123,40 @@ static char *getMemoryUsage() {
 }
 static char *getCPUUsage() {
   static char cpuStatus[64];
-  unsigned long user1, nice1, system1, idle1, iowait1, irq1, softirq1;
-  unsigned long user2, nice2, system2, idle2, iowait2, irq2, softirq2;
-  unsigned long total1, total2, idleTime1, idleTime2;
-  FILE *cpuFile;
-  cpuFile = fopen("/proc/stat", "r");
-  if (!cpuFile) {
-    snprintf(cpuStatus, sizeof(cpuStatus), "CPU: Unknown");
-    return cpuStatus;
-  }
-  if (fscanf(cpuFile, "cpu %lu %lu %lu %lu %lu %lu %lu", &user1, &nice1, &system1, &idle1, &iowait1,
-             &irq1, &softirq1) != 7) {
-    fclose(cpuFile);
-    snprintf(cpuStatus, sizeof(cpuStatus), "CPU: Error reading stats");
-    return cpuStatus;
-  }
-  fclose(cpuFile);
-  struct timespec ts = {0, 100000000};
-  nanosleep(&ts, NULL);
-  cpuFile = fopen("/proc/stat", "r");
+  static unsigned long lastTotal = 0, lastIdle = 0;
+  static _Bool firstCall = True;
+  unsigned long user, nice, system, idle, iowait, irq, softirq;
+  FILE *cpuFile = fopen("/proc/stat", "r");
   if (!cpuFile) {
     snprintf(cpuStatus, sizeof(cpuStatus), "cpu: Unknown");
     return cpuStatus;
   }
-  if (fscanf(cpuFile, "cpu %lu %lu %lu %lu %lu %lu %lu", &user2, &nice2, &system2, &idle2, &iowait2,
-             &irq2, &softirq2) != 7) {
+  if (fscanf(cpuFile, "cpu %lu %lu %lu %lu %lu %lu %lu", &user, &nice, &system, &idle, &iowait,
+             &irq, &softirq) != 7) {
     fclose(cpuFile);
-    snprintf(cpuStatus, sizeof(cpuStatus), "cpu: Error reading stats");
+    snprintf(cpuStatus, sizeof(cpuStatus), "cpu: Error");
     return cpuStatus;
   }
   fclose(cpuFile);
-  total1                  = user1 + nice1 + system1 + idle1 + iowait1 + irq1 + softirq1;
-  total2                  = user2 + nice2 + system2 + idle2 + iowait2 + irq2 + softirq2;
-  idleTime1               = idle1 + iowait1;
-  idleTime2               = idle2 + iowait2;
-  unsigned long totalDiff = total2 - total1;
-  unsigned long idleDiff  = idleTime2 - idleTime1;
+  unsigned long total   = user + nice + system + idle + iowait + irq + softirq;
+  unsigned long idleAll = idle + iowait;
+  if (firstCall) {
+    lastTotal = total;
+    lastIdle  = idleAll;
+    firstCall = False;
+    snprintf(cpuStatus, sizeof(cpuStatus), "cpu: --");
+    return cpuStatus;
+  }
+  unsigned long totalDiff = total - lastTotal;
+  unsigned long idleDiff  = idleAll - lastIdle;
+  lastTotal               = total;
+  lastIdle                = idleAll;
   if (totalDiff == 0) {
-    snprintf(cpuStatus, sizeof(cpuStatus), "cpu: Unknown");
+    snprintf(cpuStatus, sizeof(cpuStatus), "cpu: --");
     return cpuStatus;
   }
-  unsigned long cpuUsage = (totalDiff - idleDiff) * 100 / totalDiff;
-  snprintf(cpuStatus, sizeof(cpuStatus), "cpu: %lu%%", cpuUsage);
+  unsigned long usage = (totalDiff - idleDiff) * 100 / totalDiff;
+  snprintf(cpuStatus, sizeof(cpuStatus), "cpu: %lu%%", usage);
   return cpuStatus;
 }
 static char *getNetworkInfo() {
@@ -183,7 +169,7 @@ static char *getNetworkInfo() {
     return networkStatus;
   }
   for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-    if (ifa->ifa_addr == NULL) continue;
+    if (!ifa->ifa_addr) continue;
     family = ifa->ifa_addr->sa_family;
     if (family == AF_INET) {
       n = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), host, NI_MAXHOST, NULL, 0,
@@ -217,25 +203,25 @@ static char *getBatteryStatus() {
   }
   fclose(capacityFile);
   fclose(statusFile);
+
   snprintf(batteryStatus, sizeof(batteryStatus), "b: %d%%%s", capacity,
-           strcmp(status, "Charging") == 0      ? " (char)"
-           : strcmp(status, "Discharging") == 0 ? " (dis)"
-                                                : "");
+           (strcmp(status, "Charging") == 0)      ? " (chr)"
+           : (strcmp(status, "Discharging") == 0) ? " (dsg)"
+                                                  : "");
   return batteryStatus;
 }
 static void drawStatusBar() {
   char status[512];
   snprintf(status, sizeof(status), "%s | %s | %s | %s | %s", getCurrentTime(), getBatteryStatus(),
            getMemoryUsage(), getCPUUsage(), getNetworkInfo());
+
   if (strcmp(status, previousStatus) != 0) {
-    unsigned long backgroundColor = COLOR_B;
-    unsigned long textColor       = COLOR_A;
-    XSetForeground(dpy, DefaultGC(dpy, 0), backgroundColor);
-    XFillRectangle(dpy, root, DefaultGC(dpy, 0), 0, screen_height - STATUS_BAR_HEIGHT, screen_width,
-                   STATUS_BAR_HEIGHT);
-    XSetForeground(dpy, DefaultGC(dpy, 0), textColor);
-    XDrawString(dpy, root, DefaultGC(dpy, 0), 10, screen_height - STATUS_BAR_HEIGHT + 15, status,
+    XSetForeground(dpy, DefaultGC(dpy, 0), COLOR_B);
+    XFillRectangle(dpy, barWindow, DefaultGC(dpy, 0), 0, 0, screen_width, STATUS_BAR_HEIGHT);
+    XSetForeground(dpy, DefaultGC(dpy, 0), COLOR_A);
+    XDrawString(dpy, barWindow, DefaultGC(dpy, 0), 10, STATUS_BAR_HEIGHT - 5, status,
                 strlen(status));
+
     strncpy(previousStatus, status, sizeof(previousStatus) - 1);
   }
 }
@@ -261,23 +247,33 @@ static void setup(void) {
   if (!getenv("DISPLAY")) die("DISPLAY not set");
   if (!(dpy = XOpenDisplay(NULL))) die("cannot open display");
   root = DefaultRootWindow(dpy);
-  for (unsigned char i = 0; i < MAX_DESKTOPS; i++) {
-    desktops[i].windowCount = 0;
-    desktops[i].focusedIdx  = 0;
-    for (unsigned char j = 0; j < MAX_WINDOWS_PER_DESKTOP; j++) {
-      desktops[i].windows[j]  = None;
-      desktops[i].isMapped[j] = 0;
-    }
-  }
   XWindowAttributes attr;
   XGetWindowAttributes(dpy, root, &attr);
   screen_width  = attr.width;
   screen_height = attr.height;
+  {
+    XSetWindowAttributes wa;
+    wa.override_redirect = True;
+    wa.background_pixel  = COLOR_B;
+    barWindow = XCreateWindow(
+        dpy,
+        root,
+        0, screen_height - STATUS_BAR_HEIGHT, 
+        screen_width, STATUS_BAR_HEIGHT,
+        0,
+        DefaultDepth(dpy, DefaultScreen(dpy)),
+        CopyFromParent,
+        DefaultVisual(dpy, DefaultScreen(dpy)),
+        CWOverrideRedirect | CWBackPixel,
+        &wa
+    );
+    XMapWindow(dpy, barWindow);
+    XRaiseWindow(dpy, barWindow);
+}
   XSetErrorHandler(xerrorstart);
   XSelectInput(dpy, root, SubstructureRedirectMask | SubstructureNotifyMask | StructureNotifyMask);
   Cursor cursor = XCreateFontCursor(dpy, 68);
   XDefineCursor(dpy, root, cursor);
-  XSync(dpy, False);
   XSetErrorHandler(xerror);
   grabKeys();
   XSync(dpy, False);
@@ -486,6 +482,7 @@ inline static void focusWindow(Window w) {
   }
 }
 static void handleUnmapNotify(XEvent *e) {
+  if (IsSwitching) return;
   Window win = e->xunmap.window;
   Desktop *d = &desktops[currentDesktop];
   for (unsigned char i = 0; i < d->windowCount; i++) {
@@ -508,17 +505,21 @@ static void handleUnmapNotify(XEvent *e) {
 }
 static void handleDestroyNotify(XEvent *e) {
   Window win = e->xdestroywindow.window;
-  Desktop *d = &desktops[currentDesktop];
-  for (unsigned char i = 0; i < d->windowCount; i++) {
-    if (d->windows[i] == win) {
-      d->isMapped[i] = 0;
-      d->windowCount--;
-      for (unsigned char j = i; j < d->windowCount; j++) {
-        d->windows[j]  = d->windows[j + 1];
-        d->isMapped[j] = d->isMapped[j + 1];
+  for (unsigned char d_idx = 0; d_idx < MAX_DESKTOPS; d_idx++) {
+    Desktop *d = &desktops[d_idx];
+    for (unsigned char i = 0; i < d->windowCount; i++) {
+      if (d->windows[i] == win) {
+        d->isMapped[i] = 0;
+        for (unsigned char j = i; j < d->windowCount - 1; j++) {
+          d->windows[j]  = d->windows[j + 1];
+          d->isMapped[j] = d->isMapped[j + 1];
+        }
+        d->windowCount--;
+        if (d_idx == currentDesktop) {
+          tileWindows();
+        }
+        break;
       }
-      tileWindows();
-      break;
     }
   }
 }
@@ -637,6 +638,8 @@ static void handleMapNotify(XEvent *e) {
 }
 static void switchDesktop(int desktop) {
   if (desktop == currentDesktop || desktop < 0 || desktop >= MAX_DESKTOPS) return;
+  if (IsSwitching) return;
+  IsSwitching      = 1;
   Desktop *current = &desktops[currentDesktop];
   for (unsigned char i = 0; i < current->windowCount; i++) {
     XUnmapWindow(dpy, current->windows[i]);
@@ -650,4 +653,5 @@ static void switchDesktop(int desktop) {
   if (target->windowCount > 0) {
     focusWindow(target->windows[target->focusedIdx]);
   }
+  IsSwitching = 0;
 }
