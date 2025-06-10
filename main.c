@@ -53,6 +53,7 @@ static Desktop desktops[MAX_DESKTOPS];
 static unsigned char currentDesktop  = 0;
 static volatile sig_atomic_t running = 1;
 static unsigned short screen_width, screen_height;
+static _Bool statusBarVisible = True;
 static void setup(void);
 static void run(void);
 static void cleanup(void);
@@ -76,6 +77,7 @@ inline static void die(const char *msg);
 static inline int detachWindow(Window w, Window *windows, unsigned char *windowCount,
                                unsigned char *focusedIdx, _Bool *isMapped);
 static inline int detachWindowFromDesktop(Window w, Desktop *d);
+static void toggleStatusBar(void);
 static short resizeDelta        = 0;
 static char previousStatus[512] = "";
 int main(void) {
@@ -212,6 +214,8 @@ static char *getBatteryStatus() {
         return batteryStatus;
 }
 static void drawStatusBar() {
+        if (!statusBarVisible) return;
+        
         char status[512];
         snprintf(status, sizeof(status), "%s | %s | %s | %s | %s", getCurrentTime(),
                  getBatteryStatus(), getMemoryUsage(), getCPUUsage(), getNetworkInfo());
@@ -226,6 +230,16 @@ static void drawStatusBar() {
 
                 strncpy(previousStatus, status, sizeof(previousStatus) - 1);
         }
+}
+static void toggleStatusBar(void) {
+        statusBarVisible = !statusBarVisible;
+        if (statusBarVisible) {
+                XMapWindow(dpy, barWindow);
+                XRaiseWindow(dpy, barWindow);
+        } else {
+                XUnmapWindow(dpy, barWindow);
+        }
+        tileWindows();
 }
 inline static void die(const char *msg) {
         fprintf(stderr, "mwm: %s\n", msg);
@@ -281,7 +295,7 @@ static void grabKeys(void) {
         for (unsigned char i = 0; i < MAX_DESKTOPS; i++) {
                 keycodes[k++] = XKeysymToKeycode(dpy, XK_1 + i);
         }
-        KeySym specialKeys[] = {XK_q, XK_j, XK_k, XK_h, XK_l};
+        KeySym specialKeys[] = {XK_q, XK_j, XK_k, XK_h, XK_l, XK_b};
         for (size_t i = 0; i < sizeof(specialKeys) / sizeof(specialKeys[0]); i++) {
                 keycodes[k++] = XKeysymToKeycode(dpy, specialKeys[i]);
         }
@@ -405,6 +419,10 @@ static void handleKeyPress(XEvent *e) {
         }
         if (keysym == XK_q && state == MOD_KEY) {
                 killFocusedWindow();
+                return;
+        }
+        if (keysym == XK_b && state == MOD_KEY) {
+                toggleStatusBar();
                 return;
         }
         if ((keysym == XK_j || keysym == XK_k) && state == MOD_KEY) {
@@ -532,9 +550,12 @@ static void tileWindows(void) {
         Desktop *d          = &desktops[currentDesktop];
         unsigned char count = d->windowCount;
         if (count == 0) return;
+        
+        int statusBarHeight = statusBarVisible ? STATUS_BAR_HEIGHT : 0;
+        
         if (count == 1) {
                 XMoveResizeWindow(dpy, d->windows[0], 0, 0, screen_width - 2 * BORDER_WIDTH,
-                                  screen_height - STATUS_BAR_HEIGHT - 2 * BORDER_WIDTH);
+                                  screen_height - statusBarHeight - 2 * BORDER_WIDTH);
                 d->isMapped[0] = 1;
                 XMapWindow(dpy, d->windows[0]);
                 focusWindow(d->windows[0]);
@@ -544,13 +565,13 @@ static void tileWindows(void) {
         int stackCount   = count - masterCount;
         int totalGapV    = stackCount * GAP_SIZE;
         int totalGapH    = 3 * GAP_SIZE;
-        int usableHeight = screen_height - STATUS_BAR_HEIGHT - totalGapV;
+        int usableHeight = screen_height - statusBarHeight - totalGapV;
         int masterWidth  = (screen_width + (resizeDelta << 1)) >> 1;
         if (masterWidth < 100) masterWidth = 100;
         if (masterWidth > screen_width - 100) masterWidth = screen_width - 100;
         int stackWidth = screen_width - masterWidth - totalGapH;
         masterWidth -= 2 * GAP_SIZE;
-        int masterHeight = screen_height - 0.5 * STATUS_BAR_HEIGHT - 2 * GAP_SIZE;
+        int masterHeight = screen_height - 0.5 * statusBarHeight - 2 * GAP_SIZE;
         int stackHeight  = stackCount > 0 ? (usableHeight / stackCount) : 0;
         int x, y, w, h;
         for (unsigned char i = 0; i < count; i++) {

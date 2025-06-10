@@ -25,6 +25,9 @@ or (after compiling `gcc audio.sh -o audio`):
 
 ### Keyboard Shortcuts
 
+#### Status Bar
+- **Mod + b**: Toggle status bar
+
 #### Window Management
 - **Mod + Enter**: Launch terminal
 - **Mod + q**: Close focused window
