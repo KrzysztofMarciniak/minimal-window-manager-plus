@@ -2,13 +2,12 @@
 
 MWM+ Expanded version of [MWM](https://github.com/KrzysztofMarciniak/minimal-window-manager) with extra features:
 
-### LOC: 650
-
 * Status Bar
 * Gaps and Borders
 
 ![main](screenshots/main.png)
 ![tiling](screenshots/tiling.png)
+![tiling](screenshots/tiling_no_statusbar.png)
 
 # Getting Started
 
