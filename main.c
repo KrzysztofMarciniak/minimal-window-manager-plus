@@ -87,78 +87,92 @@ int main(void) {
         run();
         cleanup();
 }
-static char *getCurrentTime() {
+static char *getCurrentTime(void) {
         static char timeStr[20];
-        time_t t = time(NULL);
-        struct tm tm_info;
-        if (localtime_r(&t, &tm_info) == NULL) {
+        time_t now = time(NULL);
+        if (now == (time_t)-1) {
                 timeStr[0] = '\0';
                 return timeStr;
         }
-        strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &tm_info);
+        struct tm local;
+        if (localtime_r(&now, &local) == NULL) {
+                timeStr[0] = '\0';
+                return timeStr;
+        }
+        snprintf(timeStr, sizeof(timeStr), "%04d-%02d-%02d %02d:%02d:%02d",
+                 local.tm_year + 1900, local.tm_mon + 1, local.tm_mday,
+                 local.tm_hour, local.tm_min, local.tm_sec);
+
         return timeStr;
 }
-static char *getMemoryUsage() {
-        static char memoryStatus[64];
-        FILE *memInfo = fopen("/proc/meminfo", "r");
-        if (!memInfo) {
+static char *getMemoryUsage(void) {
+        static char memoryStatus[16];
+        FILE *fp = fopen("/proc/meminfo", "r");
+        if (!fp) {
                 snprintf(memoryStatus, sizeof(memoryStatus), "m: Unknown");
                 return memoryStatus;
         }
-        unsigned long totalMemoryKB = 0, freeMemoryKB = 0, buffersKB = 0, cachedKB = 0;
-        char line[256];
-        while (fgets(line, sizeof(line), memInfo)) {
-                if (sscanf(line, "MemTotal: %lu kB", &totalMemoryKB) == 1) continue;
-                if (sscanf(line, "MemFree: %lu kB", &freeMemoryKB) == 1) continue;
-                if (sscanf(line, "Buffers: %lu kB", &buffersKB) == 1) continue;
-                if (sscanf(line, "Cached: %lu kB", &cachedKB) == 1) break;
+        unsigned long memTotal = 0, memFree = 0, buffers = 0, cached = 0;
+        char line[128];
+        while (fgets(line, sizeof(line), fp)) {
+                if (!memTotal && sscanf(line, "MemTotal: %lu kB", &memTotal) == 1) continue;
+                if (!memFree && sscanf(line, "MemFree: %lu kB", &memFree) == 1) continue;
+                if (!buffers && sscanf(line, "Buffers: %lu kB", &buffers) == 1) continue;
+                if (!cached && sscanf(line, "Cached: %lu kB", &cached) == 1) continue;
+                if (memTotal && memFree && buffers && cached) break;
         }
-        fclose(memInfo);
-        if (totalMemoryKB == 0) {
+        fclose(fp);
+        if (!memTotal) {
                 snprintf(memoryStatus, sizeof(memoryStatus), "m: Unknown");
         } else {
-                unsigned long usedMemoryKB = totalMemoryKB - (freeMemoryKB + buffersKB + cachedKB);
-                unsigned long memoryUtilization = (usedMemoryKB * 100) / totalMemoryKB;
-                snprintf(memoryStatus, sizeof(memoryStatus), "m: %lu%%", memoryUtilization);
+                unsigned long used = memTotal - (memFree + buffers + cached);
+                unsigned long percent = (used * 100) / memTotal;
+                snprintf(memoryStatus, sizeof(memoryStatus), "m: %lu%%", percent);
         }
         return memoryStatus;
 }
-static char *getCPUUsage() {
-        static char cpuStatus[64];
+static char *getCPUStatus(void) {
+        static char cpuStatus[24];
         static unsigned long lastTotal = 0, lastIdle = 0;
-        static _Bool firstCall = True;
+        static _Bool firstCall = 1;
+        FILE *fp = fopen("/proc/stat", "r");
+        if (!fp) {
+                snprintf(cpuStatus, sizeof(cpuStatus), "c:Unknown");
+                return cpuStatus;
+        }
         unsigned long user, nice, system, idle, iowait, irq, softirq;
-        FILE *cpuFile = fopen("/proc/stat", "r");
-        if (!cpuFile) {
-                snprintf(cpuStatus, sizeof(cpuStatus), "cpu: Unknown");
+        if (fscanf(fp, "cpu %lu %lu %lu %lu %lu %lu %lu",
+                   &user, &nice, &system, &idle, &iowait, &irq, &softirq) != 7) {
+                fclose(fp);
+                snprintf(cpuStatus, sizeof(cpuStatus), "c:Error");
                 return cpuStatus;
         }
-        if (fscanf(cpuFile, "cpu %lu %lu %lu %lu %lu %lu %lu", &user, &nice, &system, &idle,
-                   &iowait, &irq, &softirq) != 7) {
-                fclose(cpuFile);
-                snprintf(cpuStatus, sizeof(cpuStatus), "cpu: Error");
-                return cpuStatus;
-        }
-        fclose(cpuFile);
-        unsigned long total   = user + nice + system + idle + iowait + irq + softirq;
+        fclose(fp);
         unsigned long idleAll = idle + iowait;
-        if (firstCall) {
-                lastTotal = total;
-                lastIdle  = idleAll;
-                firstCall = False;
-                snprintf(cpuStatus, sizeof(cpuStatus), "cpu: --");
-                return cpuStatus;
+        unsigned long total = user + nice + system + idleAll + irq + softirq;
+        unsigned long usage = 0;
+        if (!firstCall) {
+                unsigned long totalDiff = total - lastTotal;
+                unsigned long idleDiff = idleAll - lastIdle;
+                if (totalDiff != 0)
+                        usage = (totalDiff - idleDiff) * 100 / totalDiff;
+        } else {
+                firstCall = 0;
         }
-        unsigned long totalDiff = total - lastTotal;
-        unsigned long idleDiff  = idleAll - lastIdle;
-        lastTotal               = total;
-        lastIdle                = idleAll;
-        if (totalDiff == 0) {
-                snprintf(cpuStatus, sizeof(cpuStatus), "cpu: --");
-                return cpuStatus;
+        lastTotal = total;
+        lastIdle = idleAll;
+        int tempC = -1;
+        FILE *tf = fopen("/sys/class/thermal/thermal_zone0/temp", "r");
+        if (tf) {
+                int rawTemp = 0;
+                if (fscanf(tf, "%d", &rawTemp) == 1)
+                        tempC = rawTemp / 1000;
+                fclose(tf);
         }
-        unsigned long usage = (totalDiff - idleDiff) * 100 / totalDiff;
-        snprintf(cpuStatus, sizeof(cpuStatus), "cpu: %lu%%", usage);
+        if (tempC >= 0)
+                snprintf(cpuStatus, sizeof(cpuStatus), "cpu:%lu%% temp:%d", usage, tempC);
+        else
+                snprintf(cpuStatus, sizeof(cpuStatus), "cpu:%lu%%", usage);
         return cpuStatus;
 }
 static char *getNetworkInfo() {
@@ -215,10 +229,10 @@ static char *getBatteryStatus() {
 }
 static void drawStatusBar() {
         if (!statusBarVisible) return;
-        
+
         char status[512];
         snprintf(status, sizeof(status), "%s | %s | %s | %s | %s", getCurrentTime(),
-                 getBatteryStatus(), getMemoryUsage(), getCPUUsage(), getNetworkInfo());
+                 getBatteryStatus(), getMemoryUsage(), getCPUStatus(), getNetworkInfo());
 
         if (strcmp(status, previousStatus) != 0) {
                 XSetForeground(dpy, DefaultGC(dpy, 0), COLOR_B);
@@ -550,9 +564,7 @@ static void tileWindows(void) {
         Desktop *d          = &desktops[currentDesktop];
         unsigned char count = d->windowCount;
         if (count == 0) return;
-        
         int statusBarHeight = statusBarVisible ? STATUS_BAR_HEIGHT : 0;
-        
         if (count == 1) {
                 XMoveResizeWindow(dpy, d->windows[0], 0, 0, screen_width - 2 * BORDER_WIDTH,
                                   screen_height - statusBarHeight - 2 * BORDER_WIDTH);
@@ -561,17 +573,17 @@ static void tileWindows(void) {
                 focusWindow(d->windows[0]);
                 return;
         }
-        int masterCount  = count >= 1 ? 1 : 0;
+        int masterCount  = 1;
         int stackCount   = count - masterCount;
-        int totalGapV    = stackCount * GAP_SIZE;
+        int totalGapV    = (stackCount + 1) * GAP_SIZE;
         int totalGapH    = 3 * GAP_SIZE;
         int usableHeight = screen_height - statusBarHeight - totalGapV;
         int masterWidth  = (screen_width + (resizeDelta << 1)) >> 1;
         if (masterWidth < 100) masterWidth = 100;
         if (masterWidth > screen_width - 100) masterWidth = screen_width - 100;
         int stackWidth = screen_width - masterWidth - totalGapH;
-        masterWidth -= 2 * GAP_SIZE;
-        int masterHeight = screen_height - 0.5 * statusBarHeight - 2 * GAP_SIZE;
+        masterWidth -= 2 * BORDER_WIDTH;
+        int masterHeight = screen_height - statusBarHeight - 2 * GAP_SIZE;
         int stackHeight  = stackCount > 0 ? (usableHeight / stackCount) : 0;
         int x, y, w, h;
         for (unsigned char i = 0; i < count; i++) {
@@ -579,13 +591,13 @@ static void tileWindows(void) {
                 if (i == 0 && masterCount == 1) {
                         x = GAP_SIZE;
                         y = GAP_SIZE;
-                        w = masterWidth - 2 * BORDER_WIDTH;
+                        w = masterWidth;
                         h = masterHeight - 2 * BORDER_WIDTH;
                 } else {
-                        int stackIdx = i - 1;
-                        x            = masterWidth + 2 * GAP_SIZE;
+                        int stackIdx = i - masterCount;
+                        x            = masterWidth + 2 * GAP_SIZE + BORDER_WIDTH;
                         y            = GAP_SIZE + stackIdx * (stackHeight + GAP_SIZE);
-                        w            = stackWidth - 1.5 * BORDER_WIDTH;
+                        w            = stackWidth - 2 * BORDER_WIDTH;
                         h            = stackHeight - 2 * BORDER_WIDTH;
                 }
                 XMoveResizeWindow(dpy, d->windows[i], x, y, w, h);
