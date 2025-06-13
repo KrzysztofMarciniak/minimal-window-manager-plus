@@ -1,5 +1,5 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -pedantic -O3 -march=native -flto -ffast-math -fomit-frame-pointer -ffunction-sections -fdata-sections -Os -DAUDIO_SCRIPT="\"$(shell pwd)/audio.sh\""
+CC = gcc # tcc is slower in virtual memory.
+CFLAGS = -Wall -Wextra -pedantic -march=native -flto -ffast-math -fomit-frame-pointer -ffunction-sections -fdata-sections -Os -DAUDIO_SCRIPT="\"$(shell pwd)/audio.sh\""
 LDFLAGS = -lX11 -Wl,--gc-sections -Wl,--as-needed -Wl,-O1 -lm
 TARGET = mwmp
 SRC = main.c
