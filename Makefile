@@ -1,6 +1,6 @@
 CC = gcc # tcc and clang are slower in virtual memory.
-CFLAGS = -Wall -Wextra -pedantic -march=native -flto -ffast-math -fomit-frame-pointer -ffunction-sections -fdata-sections -Os -DAUDIO_SCRIPT="\"$(shell pwd)/audio.sh\""
-LDFLAGS = -lX11 -Wl,--gc-sections -Wl,--as-needed -Wl,-O1 -lm
+CFLAGS = -Wall -Wextra -pedantic -O3 -fno-asynchronous-unwind-tables -fno-unwind-tables -march=native -flto -ffast-math -fomit-frame-pointer -ffunction-sections -fdata-sections -Os -DAUDIO_SCRIPT="\"$(shell pwd)/audio.sh\"" -DSTATUS_BAR_SCRIPT="\"$(shell pwd)/status_bar_script.sh\""
+LDFLAGS = -lX11 -s -Wl,--gc-sections -Wl,--as-needed -Wl,-O1 
 TARGET = mwmp
 SRC = main.c
 PREFIX = /usr/local

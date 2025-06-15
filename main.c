@@ -28,6 +28,10 @@
 #define STATUS_BAR_SCRIPT ""
 #endif
 
+static char previousStatus[512] = "";
+static _Bool statusBarVisible   = True;
+static Window barWindow;
+
 typedef struct {
         KeySym keysym;
         const char *command;
@@ -83,6 +87,22 @@ inline static void die(void);
 inline static void initDesktops(void);
 inline static void cleanupDesktops(void);
 inline static void adjustFocusAfterRemoval(Desktop *d);
+
+static void toggleStatusBar(void);
+
+static void toggleStatusBar(void) {
+        statusBarVisible = !statusBarVisible;
+        if (statusBarVisible) {
+                XMapWindow(dpy, barWindow);
+                XRaiseWindow(dpy, barWindow);
+        } else {
+                XUnmapWindow(dpy, barWindow);
+        }
+        tileWindows();
+}
+static void drawStatusBar() {
+        if (!statusBarVisible) return;
+}
 int main(void) {
         signal(SIGTERM, sigHandler);
         signal(SIGINT, sigHandler);
@@ -128,6 +148,17 @@ static void setup(void) {
         if (!XGetWindowAttributes(dpy, root, &attr)) die();
         screen_width  = attr.width;
         screen_height = attr.height;
+        {
+                XSetWindowAttributes wa;
+                wa.override_redirect = True;
+                wa.background_pixel  = COLOR_B;
+                barWindow            = XCreateWindow(
+                    dpy, root, 0, screen_height - STATUS_BAR_HEIGHT, screen_width,
+                    STATUS_BAR_HEIGHT, 0, DefaultDepth(dpy, DefaultScreen(dpy)), CopyFromParent,
+                    DefaultVisual(dpy, DefaultScreen(dpy)), CWOverrideRedirect | CWBackPixel, &wa);
+                XMapWindow(dpy, barWindow);
+                XRaiseWindow(dpy, barWindow);
+        }
         XSetErrorHandler(xerror);
         XSelectInput(dpy, root,
                      SubstructureRedirectMask | SubstructureNotifyMask | StructureNotifyMask);
@@ -151,7 +182,7 @@ static void grabKeys(void) {
         for (unsigned char i = 0; i < MAX_DESKTOPS; ++i) {
                 grabKey(XK_1 + i, MOD_KEY, True);
         }
-        static const KeySym wmKeys[] = {XK_q, XK_j, XK_k, XK_h, XK_l};
+        static const KeySym wmKeys[] = {XK_q, XK_j, XK_k, XK_h, XK_l, XK_b};
         for (unsigned char i = 0; i < ARRAY_LEN(wmKeys); ++i) {
                 grabKey(wmKeys[i], MOD_KEY, True);
         }
@@ -237,6 +268,10 @@ static void handleKeyPress(XEvent *e) {
         unsigned int state = ev->state;
         if (keysym == XK_q && state == (MOD_KEY | ShiftMask)) {
                 running = 0;
+                return;
+        }
+        if (keysym == XK_b && state == MOD_KEY) {
+                toggleStatusBar();
                 return;
         }
         if ((keysym == XK_h || keysym == XK_l) && state == (MOD_KEY | ShiftMask)) {
@@ -361,10 +396,11 @@ static void cleanup(void) {
 }
 static void tileWindows(void) {
         if (P_CURRENT_DESKTOP->windowCount == 0) return;
+        unsigned char statusBarHeight = statusBarVisible ? STATUS_BAR_HEIGHT : 0;
         if (P_CURRENT_DESKTOP->windowCount == 1) {
                 XMoveResizeWindow(dpy, P_CURRENT_DESKTOP->windows[0], 0, 0,
                                   screen_width - 2 * BORDER_WIDTH,
-                                  screen_height - STATUS_BAR_HEIGHT - 2 * BORDER_WIDTH);
+                                  screen_height - statusBarHeight - 2 * BORDER_WIDTH);
                 XMapWindow(dpy, P_CURRENT_DESKTOP->windows[0]);
                 focusWindow(P_CURRENT_DESKTOP->windows[0]);
                 return;
@@ -372,12 +408,12 @@ static void tileWindows(void) {
         unsigned char stackCount  = P_CURRENT_DESKTOP->windowCount - 1;
         unsigned short half_width = (screen_width - 3 * GAP_SIZE) >> 1;
         unsigned short stackHeight =
-            (screen_height - ((stackCount + 1) * GAP_SIZE) - STATUS_BAR_HEIGHT) / stackCount;
+            (screen_height - ((stackCount + 1) * GAP_SIZE) - statusBarHeight) / stackCount;
         Window master = P_CURRENT_DESKTOP->windows[0];
         XSetWindowBorderWidth(dpy, master, BORDER_WIDTH);
         XSetWindowBorder(dpy, master, (P_CURRENT_DESKTOP->focusedIdx == 0) ? COLOR_A : COLOR_B);
         XMoveResizeWindow(dpy, master, GAP_SIZE, GAP_SIZE, half_width - 2 * BORDER_WIDTH,
-                          screen_height - 2 * GAP_SIZE - 2 * BORDER_WIDTH - STATUS_BAR_HEIGHT);
+                          screen_height - 2 * GAP_SIZE - 2 * BORDER_WIDTH - statusBarHeight);
         for (unsigned char i = 1; i < P_CURRENT_DESKTOP->windowCount; i++) {
                 Window w = P_CURRENT_DESKTOP->windows[i];
                 XSetWindowBorderWidth(dpy, w, BORDER_WIDTH);
