@@ -369,34 +369,23 @@ static void tileWindows(void) {
                 focusWindow(P_CURRENT_DESKTOP->windows[0]);
                 return;
         }
-        unsigned char stackCount = P_CURRENT_DESKTOP->windowCount - 1;
-        const unsigned short gap_between = GAP_SIZE;
-        const unsigned short outer_gap   = GAP_SIZE;
-        const unsigned short total_width = screen_width - 2 * outer_gap;
-        const unsigned short half_width  = (total_width - gap_between) >> 1;
-        const unsigned short master_x     = outer_gap;
-        const unsigned short master_width = half_width;
-        const unsigned short stack_x     = master_x + master_width + gap_between;
-        const unsigned short stack_width = half_width;
-        const unsigned short totalGapsHeight  = (stackCount + 1) * GAP_SIZE;
-        const unsigned short available_height = screen_height - totalGapsHeight - STATUS_BAR_HEIGHT;
-        const unsigned short stackHeight      = stackCount > 0 ? available_height / stackCount : 0;
+        unsigned char stackCount  = P_CURRENT_DESKTOP->windowCount - 1;
+        unsigned short half_width = (screen_width - 3 * GAP_SIZE) >> 1;
+        unsigned short stackHeight =
+            (screen_height - ((stackCount + 1) * GAP_SIZE) - STATUS_BAR_HEIGHT) / stackCount;
         Window master = P_CURRENT_DESKTOP->windows[0];
         XSetWindowBorderWidth(dpy, master, BORDER_WIDTH);
         XSetWindowBorder(dpy, master, (P_CURRENT_DESKTOP->focusedIdx == 0) ? COLOR_A : COLOR_B);
-        XMoveResizeWindow(dpy, master, master_x, outer_gap, master_width - 2 * BORDER_WIDTH,
-                          screen_height - 2 * outer_gap - 2 * BORDER_WIDTH - STATUS_BAR_HEIGHT);
+        XMoveResizeWindow(dpy, master, GAP_SIZE, GAP_SIZE, half_width - 2 * BORDER_WIDTH,
+                          screen_height - 2 * GAP_SIZE - 2 * BORDER_WIDTH - STATUS_BAR_HEIGHT);
         for (unsigned char i = 1; i < P_CURRENT_DESKTOP->windowCount; i++) {
                 Window w = P_CURRENT_DESKTOP->windows[i];
                 XSetWindowBorderWidth(dpy, w, BORDER_WIDTH);
                 XSetWindowBorder(dpy, w, (i == P_CURRENT_DESKTOP->focusedIdx) ? COLOR_A : COLOR_B);
-                unsigned short x      = stack_x;
-                unsigned short y      = outer_gap + (i - 1) * (stackHeight + GAP_SIZE);
-                unsigned short width  = stack_width - 2 * BORDER_WIDTH;
-                unsigned short height = stackHeight - 2 * BORDER_WIDTH;
-                if (width < 1) width = 1;
-                if (height < 1) height = 1;
-                XMoveResizeWindow(dpy, w, x, y, width, height);
+
+                XMoveResizeWindow(dpy, w, GAP_SIZE * 2 + half_width,
+                                  GAP_SIZE + (i - 1) * (stackHeight + GAP_SIZE),
+                                  half_width - 2 * BORDER_WIDTH, stackHeight - 2 * BORDER_WIDTH);
         }
         XRaiseWindow(dpy, P_CURRENT_DESKTOP->windows[P_CURRENT_DESKTOP->focusedIdx]);
 }
