@@ -129,44 +129,49 @@ char *myStrncpy(char *dest, const char *src, short n) {
         }
         return dest;
 }
-
+static void runStatusBar(void) {
+        if (statusPid != 0) return;
+        int pipefd[2];
+        if (pipe(pipefd) < 0) die();
+        pid_t pid = fork();
+        if (pid < 0) die();
+        if (pid == 0) {
+                setsid();
+                for (int fd = 0; fd <= 2; fd++) close(fd);
+                dup2(pipefd[1], STDOUT_FILENO);
+                close(pipefd[0]);
+                close(pipefd[1]);
+                execl("/bin/sh", "sh", "-c", STATUS_BAR_SCRIPT, NULL);
+                _exit(EXIT_FAILURE);
+        }
+        close(pipefd[1]);
+        statusFd  = pipefd[0];
+        statusPid = pid;
+}
+static void killStatusBar(void) {
+        if (statusPid != 0) {
+                kill(statusPid, SIGTERM);
+                waitpid(statusPid, NULL, 0);
+                statusPid = 0;
+        }
+        if (statusFd != -1) {
+                close(statusFd);
+                statusFd = -1;
+        }
+}
 static void toggleStatusBar(void) {
         statusBarVisible = !statusBarVisible;
         if (statusBarVisible) {
-                if (statusPid == 0) {
-                        int pipefd[2];
-                        if (pipe(pipefd) < 0) die();
-                        pid_t pid = fork();
-                        if (pid < 0) die();
-                        if (pid == 0) {
-                                setsid();
-                                for (int fd = 0; fd <= 2; fd++) close(fd);
-                                dup2(pipefd[1], STDOUT_FILENO);
-                                close(pipefd[0]);
-                                close(pipefd[1]);
-                                execl("/bin/sh", "sh", "-c", STATUS_BAR_SCRIPT, NULL);
-                                _exit(EXIT_FAILURE);
-                        }
-                        close(pipefd[1]);
-                        statusFd  = pipefd[0];
-                        statusPid = pid;
-                }
+                runStatusBar();
                 XMapWindow(dpy, barWindow);
                 XRaiseWindow(dpy, barWindow);
         } else {
                 XUnmapWindow(dpy, barWindow);
-                if (statusPid != 0) {
-                        kill(statusPid, SIGTERM);
-                        waitpid(statusPid, NULL, 0);
-                        statusPid = 0;
-                        if (statusFd != -1) {
-                                close(statusFd);
-                                statusFd = -1;
-                        }
-                }
+                killStatusBar();
         }
         tileWindows();
 }
+
 static void drawStatusBar() {
         if (!statusBarVisible) return;
         short len = myStrlen(currentStatus);
@@ -306,6 +311,9 @@ static void run(void) {
                         if (n > 0) {
                                 drawStatusBar();
                                 XFlush(dpy);
+                        } else {
+                                killStatusBar();
+                                runStatusBar();
                         }
                 }
         }
@@ -489,30 +497,28 @@ static void tileWindows(void) {
         if (P_CURRENT_DESKTOP->windowCount == 0) return;
         unsigned char statusBarHeight = statusBarVisible ? STATUS_BAR_HEIGHT : 0;
         if (P_CURRENT_DESKTOP->windowCount == 1) {
-                XMoveResizeWindow(dpy, P_CURRENT_DESKTOP->windows[0], 0, 0,
-                                  screen_width - 2 * BORDER_WIDTH,
-                                  screen_height - statusBarHeight - 2 * BORDER_WIDTH);
-                XMapWindow(dpy, P_CURRENT_DESKTOP->windows[0]);
-                focusWindow(P_CURRENT_DESKTOP->windows[0]);
+                XMoveResizeWindow(dpy, P_CURRENT_DESKTOP->windows[0], GAP_SIZE, GAP_SIZE,
+                                  screen_width - 2 * GAP_SIZE,
+                                  screen_height - 2 * GAP_SIZE - statusBarHeight);
+                XRaiseWindow(dpy, P_CURRENT_DESKTOP->windows[0]);
                 return;
         }
-        unsigned char stackCount  = P_CURRENT_DESKTOP->windowCount - 1;
-        unsigned short half_width = (screen_width - 3 * GAP_SIZE) >> 1;
+        unsigned short masterWidth         = (screen_width + (resizeDelta << 1)) >> 1;
+        masterWidth                        = (masterWidth < 100) ? 100
+                                             : (masterWidth > screen_width - 100) ? screen_width - 100
+                                                                                  : masterWidth;
+        unsigned short totalHorizontalGaps = 3 * GAP_SIZE;
+        unsigned short stackWidth          = screen_width - masterWidth - totalHorizontalGaps;
+        unsigned char stackCount           = P_CURRENT_DESKTOP->windowCount - 1;
+        unsigned short totalVerticalGaps   = (stackCount + 1) * GAP_SIZE;
         unsigned short stackHeight =
-            (screen_height - ((stackCount + 1) * GAP_SIZE) - statusBarHeight) / stackCount;
-        Window master = P_CURRENT_DESKTOP->windows[0];
-        XSetWindowBorderWidth(dpy, master, BORDER_WIDTH);
-        XSetWindowBorder(dpy, master, (P_CURRENT_DESKTOP->focusedIdx == 0) ? COLOR_A : COLOR_B);
-        XMoveResizeWindow(dpy, master, GAP_SIZE, GAP_SIZE, half_width - 2 * BORDER_WIDTH,
-                          screen_height - 2 * GAP_SIZE - 2 * BORDER_WIDTH - statusBarHeight);
+            (screen_height - totalVerticalGaps - statusBarHeight) / stackCount;
+        XMoveResizeWindow(dpy, P_CURRENT_DESKTOP->windows[0], GAP_SIZE, GAP_SIZE, masterWidth,
+                          screen_height - 2 * GAP_SIZE - statusBarHeight);
         for (unsigned char i = 1; i < P_CURRENT_DESKTOP->windowCount; i++) {
-                Window w = P_CURRENT_DESKTOP->windows[i];
-                XSetWindowBorderWidth(dpy, w, BORDER_WIDTH);
-                XSetWindowBorder(dpy, w, (i == P_CURRENT_DESKTOP->focusedIdx) ? COLOR_A : COLOR_B);
-
-                XMoveResizeWindow(dpy, w, GAP_SIZE * 2 + half_width,
-                                  GAP_SIZE + (i - 1) * (stackHeight + GAP_SIZE),
-                                  half_width - 2 * BORDER_WIDTH, stackHeight - 2 * BORDER_WIDTH);
+                XMoveResizeWindow(dpy, P_CURRENT_DESKTOP->windows[i], masterWidth + 2 * GAP_SIZE,
+                                  GAP_SIZE + (i - 1) * (stackHeight + GAP_SIZE), stackWidth,
+                                  stackHeight);
         }
         XRaiseWindow(dpy, P_CURRENT_DESKTOP->windows[P_CURRENT_DESKTOP->focusedIdx]);
 }
