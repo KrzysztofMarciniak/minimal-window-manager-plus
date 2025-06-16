@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/select.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #define RESIZE_STEP 50
@@ -31,9 +32,10 @@
 
 static char currentStatus[STATUS_BAR_LENGTH]  = "";
 static char previousStatus[STATUS_BAR_LENGTH] = "";
-static _Bool statusBarVisible                 = True;
+static _Bool statusBarVisible;
 static Window barWindow;
-static int statusFd = -1;
+static int statusFd    = -1;
+static pid_t statusPid = 0;
 
 typedef struct {
         KeySym keysym;
@@ -102,7 +104,7 @@ unsigned short myStrlen(const char *s) {
         return len;
 }
 /*
-research why this was 0.01Ki slower.
+pointer takes 0.1Ki more space.
 unsigned short myStrlen(const char *s) {
     const char *p = s;
     while (*p) ++p;
@@ -127,13 +129,41 @@ char *myStrncpy(char *dest, const char *src, short n) {
         }
         return dest;
 }
+
 static void toggleStatusBar(void) {
         statusBarVisible = !statusBarVisible;
         if (statusBarVisible) {
+                if (statusPid == 0) {
+                        int pipefd[2];
+                        if (pipe(pipefd) < 0) die();
+                        pid_t pid = fork();
+                        if (pid < 0) die();
+                        if (pid == 0) {
+                                setsid();
+                                for (int fd = 0; fd <= 2; fd++) close(fd);
+                                dup2(pipefd[1], STDOUT_FILENO);
+                                close(pipefd[0]);
+                                close(pipefd[1]);
+                                execl("/bin/sh", "sh", "-c", STATUS_BAR_SCRIPT, NULL);
+                                _exit(EXIT_FAILURE);
+                        }
+                        close(pipefd[1]);
+                        statusFd  = pipefd[0];
+                        statusPid = pid;
+                }
                 XMapWindow(dpy, barWindow);
                 XRaiseWindow(dpy, barWindow);
         } else {
                 XUnmapWindow(dpy, barWindow);
+                if (statusPid != 0) {
+                        kill(statusPid, SIGTERM);
+                        waitpid(statusPid, NULL, 0);
+                        statusPid = 0;
+                        if (statusFd != -1) {
+                                close(statusFd);
+                                statusFd = -1;
+                        }
+                }
         }
         tileWindows();
 }
@@ -217,21 +247,7 @@ static void setup(void) {
         Cursor cursor = XCreateFontCursor(dpy, 68);
         if (cursor == None) die();
         XDefineCursor(dpy, root, cursor);
-        int pipefd[2];
-        if (pipe(pipefd) < 0) die();
-        pid_t pid = fork();
-        if (pid < 0) die();
-        if (pid == 0) {
-                setsid();
-                for (int fd = 0; fd <= 2; fd++) close(fd);
-                dup2(pipefd[1], STDOUT_FILENO);
-                close(pipefd[0]);
-                close(pipefd[1]);
-                execl("/bin/sh", "sh", "-c", STATUS_BAR_SCRIPT, NULL);
-                _exit(EXIT_FAILURE);
-        }
-        close(pipefd[1]);
-        statusFd = pipefd[0];
+        toggleStatusBar();
         grabKeys();
         XSync(dpy, False);
 }
@@ -259,8 +275,7 @@ static void grabKeys(void) {
 static void run(void) {
         XEvent e;
         fd_set fds;
-        int xfd   = ConnectionNumber(dpy);
-        int maxfd = xfd > statusFd ? xfd : statusFd;
+        int xfd = ConnectionNumber(dpy);
         while (running) {
                 while (XPending(dpy)) {
                         XNextEvent(dpy, &e);
@@ -282,6 +297,8 @@ static void run(void) {
                 FD_ZERO(&fds);
                 FD_SET(xfd, &fds);
                 if (statusFd >= 0) FD_SET(statusFd, &fds);
+                int maxfd = xfd;
+                if (statusFd > maxfd) maxfd = statusFd;
                 int ret = select(maxfd + 1, &fds, NULL, NULL, NULL);
                 if (ret == -1 && errno != EINTR) break;
                 if (statusFd >= 0 && FD_ISSET(statusFd, &fds)) {
@@ -417,7 +434,6 @@ inline static void focusWindow(Window w) {
         }
         XFlush(dpy);
 }
-
 static void removeWindowFromDesktop(Window win, Desktop *d) {
         for (unsigned char i = 0; i < d->windowCount; i++) {
                 if (d->windows[i] == win) {

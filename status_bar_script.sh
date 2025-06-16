@@ -1,6 +1,6 @@
 #!/bin/sh
 # Outputs a single status line (≤256 chars) for mwm+ bar.
-# Called in a forked child process; no hot-reload supported.
+# Called in a forked child process, toggle status bar to kill (Modkey + b)
 while :; do
   DATE=$(date '+%Y-%m-%d %H:%M:%S')
 
