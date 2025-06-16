@@ -23,14 +23,17 @@
 #define BORDER_WIDTH 1
 #define COLOR_A 0xFFFFFF
 #define COLOR_B 0x000000
+#define STATUS_BAR_LENGTH 256// modify this if you want longer status bar.
 #define STATUS_BAR_HEIGHT 20
 #ifndef STATUS_BAR_SCRIPT
 #define STATUS_BAR_SCRIPT ""
 #endif
 
-static char previousStatus[512] = "";
-static _Bool statusBarVisible   = True;
+static char currentStatus[STATUS_BAR_LENGTH]  = "";
+static char previousStatus[STATUS_BAR_LENGTH] = "";
+static _Bool statusBarVisible                 = True;
 static Window barWindow;
+static int statusFd = -1;
 
 typedef struct {
         KeySym keysym;
@@ -88,8 +91,42 @@ inline static void initDesktops(void);
 inline static void cleanupDesktops(void);
 inline static void adjustFocusAfterRemoval(Desktop *d);
 
+unsigned short myStrlen(const char *s);
+unsigned short myStrcmp(const char *a, const char *b);
+char *myStrncpy(char *dest, const char *src, short n);
 static void toggleStatusBar(void);
 
+unsigned short myStrlen(const char *s) {
+        short len = 0;
+        while (s[len]) len++;
+        return len;
+}
+/*
+research why this was 0.01Ki slower.
+unsigned short myStrlen(const char *s) {
+    const char *p = s;
+    while (*p) ++p;
+    return (unsigned short)(p - s);
+}
+*/
+unsigned short myStrcmp(const char *a, const char *b) {
+        while (*a && (*a == *b)) {
+                a++;
+                b++;
+        }
+        return (unsigned char)*a - (unsigned char)*b;
+}
+char *myStrncpy(char *dest, const char *src, short n) {
+        unsigned short i = 0;
+        while (i < n && src[i]) {
+                dest[i] = src[i];
+                i++;
+        }
+        while (i < n) {
+                dest[i++] = '\0';
+        }
+        return dest;
+}
 static void toggleStatusBar(void) {
         statusBarVisible = !statusBarVisible;
         if (statusBarVisible) {
@@ -102,6 +139,21 @@ static void toggleStatusBar(void) {
 }
 static void drawStatusBar() {
         if (!statusBarVisible) return;
+        short len = myStrlen(currentStatus);
+        while (len > 0 && (currentStatus[len - 1] == '\n' || currentStatus[len - 1] == '\r')) {
+                currentStatus[--len] = '\0';
+        }
+        if (myStrcmp(currentStatus, previousStatus) != 0) {
+                XSetForeground(dpy, DefaultGC(dpy, 0), COLOR_B);
+                XFillRectangle(dpy, barWindow, DefaultGC(dpy, 0), 0, 0, screen_width,
+                               STATUS_BAR_HEIGHT);
+                XSetForeground(dpy, DefaultGC(dpy, 0), COLOR_A);
+                XDrawString(dpy, barWindow, DefaultGC(dpy, 0), 10, STATUS_BAR_HEIGHT - 5,
+                            currentStatus, myStrlen(currentStatus));
+                myStrcmp(previousStatus, currentStatus);
+                previousStatus[sizeof(previousStatus) - 1] = '\0';
+                XFlush(dpy);
+        }
 }
 int main(void) {
         signal(SIGTERM, sigHandler);
@@ -114,13 +166,13 @@ inline static void initDesktops(void) {
         desktops = mmap(NULL, sizeof(Desktop) * MAX_DESKTOPS, PROT_READ | PROT_WRITE,
                         MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
         if (desktops == MAP_FAILED) {
-                __attribute__((unused)) ssize_t _ = write(2, "mwm:error mmap\n", 14);
+                __attribute__((unused)) short _ = write(2, "mwm:error mmap\n", 14);
                 _exit(1);
         }
 }
 static inline void cleanupDesktops() { munmap(desktops, sizeof(Desktop) * MAX_DESKTOPS); }
 inline static void die(void) {
-        __attribute__((unused)) ssize_t _ = write(2, "mwm:error\n", 10);
+        __attribute__((unused)) short _ = write(2, "mwm:error\n", 10);
         _exit(1);
 }
 static void sigHandler(Bool sig) {
@@ -165,7 +217,21 @@ static void setup(void) {
         Cursor cursor = XCreateFontCursor(dpy, 68);
         if (cursor == None) die();
         XDefineCursor(dpy, root, cursor);
-        XSetErrorHandler(xerror);
+        int pipefd[2];
+        if (pipe(pipefd) < 0) die();
+        pid_t pid = fork();
+        if (pid < 0) die();
+        if (pid == 0) {
+                setsid();
+                for (int fd = 0; fd <= 2; fd++) close(fd);
+                dup2(pipefd[1], STDOUT_FILENO);
+                close(pipefd[0]);
+                close(pipefd[1]);
+                execl("/bin/sh", "sh", "-c", STATUS_BAR_SCRIPT, NULL);
+                _exit(EXIT_FAILURE);
+        }
+        close(pipefd[1]);
+        statusFd = pipefd[0];
         grabKeys();
         XSync(dpy, False);
 }
@@ -193,10 +259,10 @@ static void grabKeys(void) {
 static void run(void) {
         XEvent e;
         fd_set fds;
-        int xfd = ConnectionNumber(dpy);
+        int xfd   = ConnectionNumber(dpy);
+        int maxfd = xfd > statusFd ? xfd : statusFd;
         while (running) {
-                while (XPending(
-                    dpy)) {// switches cost 0.01ki in .text, probably generating jump table.
+                while (XPending(dpy)) {
                         XNextEvent(dpy, &e);
                         if (e.type == KeyPress)
                                 handleKeyPress(&e);
@@ -215,7 +281,16 @@ static void run(void) {
                 }
                 FD_ZERO(&fds);
                 FD_SET(xfd, &fds);
-                if (select(xfd + 1, &fds, NULL, NULL, NULL) == -1 && errno != EINTR) break;
+                if (statusFd >= 0) FD_SET(statusFd, &fds);
+                int ret = select(maxfd + 1, &fds, NULL, NULL, NULL);
+                if (ret == -1 && errno != EINTR) break;
+                if (statusFd >= 0 && FD_ISSET(statusFd, &fds)) {
+                        short n = read(statusFd, currentStatus, sizeof(currentStatus) - 1);
+                        if (n > 0) {
+                                drawStatusBar();
+                                XFlush(dpy);
+                        }
+                }
         }
 }
 static void handleConfigureNotify(XEvent *e) {
