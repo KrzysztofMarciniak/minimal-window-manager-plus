@@ -6,44 +6,54 @@ while :; do
 
   # Battery
   BAT_PATH="/sys/class/power_supply/BAT0"
-  BAT_CAP=$(cat "$BAT_PATH/capacity" 2>/dev/null || echo "N/A")
-  case "$(cat "$BAT_PATH/status" 2>/dev/null)" in
-    Discharging) BAT_S="(dis)" ;;
-    Charging)    BAT_S="(chr)" ;;
-    Full)        BAT_S="(ful)" ;;
-    *)           BAT_S="" ;;
-  esac
+  if [ -f "$BAT_PATH/capacity" ]; then
+    BAT_CAP=$(cat "$BAT_PATH/capacity")
+    case $(cat "$BAT_PATH/status" 2>/dev/null) in
+      Discharging) BAT_S="(dis)" ;;
+      Charging)    BAT_S="(chr)" ;;
+      Full)        BAT_S="(ful)" ;;
+      *)           BAT_S="" ;;
+    esac
+  else
+    BAT_CAP="N/A"
+    BAT_S=""
+  fi
 
   # Memory
-  read _ MEM_TOTAL _ < <(grep MemTotal /proc/meminfo)
-  read _ MEM_FREE _  < <(grep MemAvailable /proc/meminfo)
+  MEM_TOTAL=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+  MEM_FREE=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
   MEM_USED=$((MEM_TOTAL - MEM_FREE))
   MEM_PCT=$((MEM_USED * 100 / MEM_TOTAL))
 
   # CPU
-  read _ u1 n1 s1 i1 w1 ir1 si1 st1 _ < /proc/stat
+  set -- $(grep '^cpu ' /proc/stat)
+  U1=$2; N1=$3; S1=$4; I1=$5; W1=$6; IRQ1=$7; SIRQ1=$8; ST1=$9
   sleep 1
-  read _ u2 n2 s2 i2 w2 ir2 si2 st2 _ < /proc/stat
-  IDLE1=$((i1 + w1)); IDLE2=$((i2 + w2))
-  TOTAL1=$((u1 + n1 + s1 + i1 + w1 + ir1 + si1 + st1))
-  TOTAL2=$((u2 + n2 + s2 + i2 + w2 + ir2 + si2 + st2))
-  CPU_PCT=$((100 * (TOTAL2 - TOTAL1 - (IDLE2 - IDLE1)) / (TOTAL2 - TOTAL1) ))
+  set -- $(grep '^cpu ' /proc/stat)
+  U2=$2; N2=$3; S2=$4; I2=$5; W2=$6; IRQ2=$7; SIRQ2=$8; ST2=$9
+  IDLE1=$((I1 + W1)); IDLE2=$((I2 + W2))
+  TOTAL1=$((U1 + N1 + S1 + I1 + W1 + IRQ1 + SIRQ1 + ST1))
+  TOTAL2=$((U2 + N2 + S2 + I2 + W2 + IRQ2 + SIRQ2 + ST2))
+  CPU_PCT=$((100 * (TOTAL2 - TOTAL1 - (IDLE2 - IDLE1)) / (TOTAL2 - TOTAL1)))
 
   # Temp
+  TEMP="N/A"
   for tfile in /sys/class/hwmon/hwmon*/temp1_input; do
-    [ -f "$tfile" ] && TEMP=$(( $(cat "$tfile") / 1000 )) && break
+    [ -f "$tfile" ] || continue
+    T=$(cat "$tfile")
+    TEMP=$((T / 1000))
+    break
   done
-  TEMP=${TEMP:-"N/A"}
 
   # Network
   NET_IF=""; NET_IP=""
   for iface in /sys/class/net/*; do
-    iface=$(basename "$iface")
-    [ "$(cat /sys/class/net/$iface/operstate 2>/dev/null)" = "up" ] || continue
-    ip=$(ip -4 -o addr show "$iface" | awk '{print $4}' | cut -d/ -f1 | head -1)
-    if [ -n "$ip" ]; then
-      NET_IF=$iface
-      NET_IP=$ip
+    IF=$(basename "$iface")
+    [ "$(cat "$iface/operstate" 2>/dev/null)" = "up" ] || continue
+    IP=$(ip -4 -o addr show "$IF" | awk '{print $4}' | cut -d/ -f1 | head -n1)
+    if [ -n "$IP" ]; then
+      NET_IF=$IF
+      NET_IP=$IP
       break
     fi
   done
