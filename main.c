@@ -171,6 +171,7 @@ static void drawStatusBar() {
         }
 }
 int main(void) {
+        signal(SIGCHLD, SIG_IGN);
         signal(SIGTERM, sigHandler);
         signal(SIGINT, sigHandler);
         setup();
@@ -178,7 +179,7 @@ int main(void) {
         cleanup();
 }
 inline static void die(void) {
-        __attribute__((unused)) short _ = write(2, "mwm:error\n", 10);
+        __attribute__((unused)) char _ = write(2, "mwm:error\n", 10);
         _exit(1);
 }
 static void sigHandler(Bool sig) {
