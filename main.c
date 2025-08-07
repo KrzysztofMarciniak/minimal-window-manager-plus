@@ -136,7 +136,6 @@ static void killStatusBar(void) {
         }
         if (statusPid != 0) {
                 kill(statusPid, SIGTERM);
-                waitpid(statusPid, NULL, 0);
                 statusPid = 0;
         }
 }
